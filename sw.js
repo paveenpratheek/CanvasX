@@ -1,8 +1,8 @@
-const CACHE_NAME = 'file-fabric-v1062';
+const CACHE_NAME = 'file-fabric-v1063';
 const urlsToCache = [
   './',
   './index.html',
-  './script.js?v=1062',
+  './script.js?v=1063',
   './style.css?v=1030',
   './manifest.json',
   './icon-192.png',

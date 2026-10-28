@@ -920,3 +920,19 @@ If you are a new agent picking up this project (e.g., after conversation truncat
 
 
 
+### BUG-0016 — Edits, Erases and Deletes Not Reaching fabric.json
+- **Reported**: 2026-10-28
+- **Description**: (1) Edits made in the last half second before Home, closing the tab or reloading were lost: `saveCurrentFabric()` only set a 500 ms timer that read `currentFabricHandle` when it fired, and `btnHome` cleared the handle straight away; `beforeunload` also only set the timer. Going Home and opening another canvas within that half second could write the old canvas into the new canvas's `fabric.json`. (2) Pen strokes erased with the eraser vanished from view but stayed in `fabric.json`: the eraser removed them from `state.drawings` but never asked for a save. (3) Erasing boxes and lines, deleting a file card, and deleting a clock, progress bar or text from its menu were saved only when some later edit saved; moving a lasso selection, text or a box, drawing rectangles/circles/books/boxes, plain lines and arrows, naming a new area, duplicating a file card and panning never asked for a save either. (4) A thumbnail failure showed `alert('Thumbnail error: ...')` on every save, and saves could overlap so an older write could land last.
+- **Expected**: Every change is in `fabric.json` within about half a second, and nothing is lost by going Home, opening another canvas, or closing the tab.
+- **Status**: FIXED (2026-10-29)
+- **Fix Details**: `script.js` save block (`saveCurrentFabric` ~L9090): a save now takes the canvas folder and its `state` when it is asked for; writes run one at a time through `saveChain`; `flushFabricSave()` writes at once; a save identical to the last write is skipped; `stateFabricHandle` stops saves while another canvas is still loading. Flushed before Home, in `openFabric` and `createAndLoadNewFabric`, on `visibilitychange` (hidden) and `pagehide`. `beforeunload` makes the browser ask "Leave site?" only while a changed save is still waiting or being written. Safety net: any `pointerup`, `keyup`, `change`, `drop`, `paste` or `wheel` while a canvas is open asks for a save. Explicit `saveCurrentFabric()` added to the eraser (links, drawings, areas), the pointer-up paths listed above, area naming (`finalizeArea`), file card Delete and Duplicate, and the clock/progress bar/text menu Delete. `fabric.json` format and `.fabric_lock` are unchanged.
+- **[CHANGED on 2026-10-29]**: thumbnail failure `alert()` on every save → one `console.warn` per canvas.
+- **Cache-buster**: `script.js?v=1062 → v=1063`; `sw.js` CACHE_NAME `v1062 → v1063`.
+- **Still open (not changed)**: File Fabric never re-reads `fabric.json` while a canvas is open. Chrome slows timers in hidden tabs, so the 10 s lock heartbeat can lapse past the 30 s stale limit while a canvas is still open; another program (NoteX) could then write `fabric.json`, and File Fabric's next save would overwrite it. Also still open: `fabric.json` carries transient fields and image data URLs (see GitX.md known bug 12).
+
+### 2026-10-29 — Saving Fixes
+- **What**: Fixed BUG-0016 (lost edits on Home/close, erases and deletes not saved, thumbnail alert, overlapping saves).
+- **Why**: User reported erased strokes still in fabric.json, deletes saved only after another edit, and edits lost when leaving a canvas.
+- **Files Modified**: `script.js`, `index.html`, `sw.js`
+- **Status**: DONE
+

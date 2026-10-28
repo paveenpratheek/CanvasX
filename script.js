@@ -1999,6 +1999,7 @@ function handleWorkspacePointerDown(e) {
             if (hitLinkId) {
                 state.links = state.links.filter(l => l.id !== hitLinkId);
                 scheduleRender();
+                saveCurrentFabric();
                 return;
             }
 
@@ -2080,6 +2081,7 @@ function handleWorkspacePointerDown(e) {
                     hidePropertiesPanel();
                 }
                 scheduleRender();
+                saveCurrentFabric();
                 return;
             }
             
@@ -2119,6 +2121,7 @@ function handleWorkspacePointerDown(e) {
                     }
                 }
                 scheduleRender();
+                saveCurrentFabric();
             }
             } // close if (state.eraserMode !== 'lines')
             
@@ -2883,6 +2886,7 @@ function handleWorkspacePointerUp(e) {
             workspace.style.cursor = 'grab';
             state.isPanning = false;
             workspace.releasePointerCapture(e.pointerId);
+            saveCurrentFabric(); // the view is part of the saved canvas
         } else if (state.isDrawingLasso) {
             state.isDrawingLasso = false;
             // Calculate what is fully inside state.lassoPolygon
@@ -2910,6 +2914,7 @@ function handleWorkspacePointerUp(e) {
             workspace.releasePointerCapture(e.pointerId);
             recalculateItemLinks();
             scheduleRender();
+            saveCurrentFabric();
         } else if (state.resizingText) {
             state.resizingText = null;
             workspace.style.cursor = 'grab';
@@ -2920,6 +2925,7 @@ function handleWorkspacePointerUp(e) {
             state.draggingText = null;
             workspace.style.cursor = 'grab';
             workspace.releasePointerCapture(e.pointerId);
+            saveCurrentFabric();
         } else if (state.draggingTotem) {
             state.draggingTotem = null;
             workspace.style.cursor = 'grab';
@@ -2933,6 +2939,7 @@ function handleWorkspacePointerUp(e) {
             workspace.style.cursor = 'grab';
             workspace.releasePointerCapture(e.pointerId);
             recalculateItemLinks(); // Re-bind files that might have been scooped up or left behind
+            saveCurrentFabric();
         } else if (smoothPen.isDrawing) {
             const pathPoints = smoothPen.end();
             workspace.releasePointerCapture(e.pointerId);
@@ -2966,9 +2973,10 @@ function handleWorkspacePointerUp(e) {
                         state.drawings.push({ id: t + '-2', type: 'line', color: state.areaColor, start: p2, end: p3 });
                         state.drawings.push({ id: t + '-3', type: 'line', color: state.areaColor, start: p3, end: p4 });
                         state.drawings.push({ id: t + '-4', type: 'line', color: state.areaColor, start: p4, end: p1 });
-                        
+
                         state.currentPolygon = [];
                         scheduleRender();
+                        saveCurrentFabric();
                         return; // Done
                     }
 
@@ -3026,6 +3034,7 @@ function handleWorkspacePointerUp(e) {
                         if (typeof refreshFolderWidgets === 'function') refreshFolderWidgets(activeArea.id);
                         state.currentPolygon = [];
                         scheduleRender();
+                        saveCurrentFabric();
                     } else {
                         if (state.mode === 'book') {
                             openNamePrompt('book');
@@ -3069,6 +3078,7 @@ function handleWorkspacePointerUp(e) {
                         start: { ...state.shapeStartWorld },
                         end: { ...state.shapeEndWorld }
                     });
+                    saveCurrentFabric();
                 }
                 state.linkDraftStart = null;
                 scheduleRender();
@@ -3351,10 +3361,11 @@ function openNamePrompt(type = 'area') {
                 renderFileItem(gf);
             }
         }
-        
+
         state.currentPolygon = [];
         setMode('select');
         scheduleRender();
+        saveCurrentFabric();
     };
     
     input.addEventListener('keydown', (e) => {
@@ -4211,6 +4222,7 @@ function renderFileItem(fileData) {
         const assignedArea = state.areas.find(a => a.id === fileData.areaId);
         assignFileToStorage(newFileData, assignedArea);
         renderFileItem(newFileData);
+        saveCurrentFabric();
     });
 
     el.querySelector('.action-delete').addEventListener('pointerdown', (e) => {
@@ -4221,6 +4233,7 @@ function renderFileItem(fileData) {
         globalBookFiles = globalBookFiles.filter(f => f.id !== fileData.id);
         saveGlobalShelves();
         el.remove();
+        saveCurrentFabric();
     });
 
     menu.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -4789,6 +4802,7 @@ function showClockContextMenu(screenX, screenY, clockDrawing) {
         dismissClockContextMenu();
         state.drawings = state.drawings.filter(d => d.id !== clockDrawing.id);
         scheduleRender();
+        saveCurrentFabric();
     });
     
     const dismissHandler = (e) => {
@@ -4898,6 +4912,7 @@ function showProgressBarContextMenu(screenX, screenY, pbDrawing) {
         dismissProgressBarContextMenu();
         state.drawings = state.drawings.filter(d => d.id !== pbDrawing.id);
         scheduleRender();
+        saveCurrentFabric();
     });
     
     // Dismiss on click outside
@@ -5003,6 +5018,7 @@ function showTextContextMenu(screenX, screenY, textDrawing) {
             hidePropertiesPanel();
         }
         scheduleRender();
+        saveCurrentFabric();
     });
     
     // Dismiss on click outside
@@ -8891,14 +8907,17 @@ btnCreateFabric.addEventListener('click', async () => {
 
 async function createAndLoadNewFabric(name, bgColor, importState = null) {
     newFabricModal.classList.add('hidden');
-    
+    await flushFabricSave(); // a save still waiting is written to its own canvas first
+    stateFabricHandle = null;
+
     // Create folder and sources
     currentFabricHandle = await targetWorkspaceHandle.getDirectoryHandle(name, { create: true });
     currentSourcesHandle = await currentFabricHandle.getDirectoryHandle('sources', { create: true });
     currentFabricName = name;
     
     prepareFabricState(importState, bgColor);
-    
+    stateFabricHandle = currentFabricHandle;
+
     // Save to fabric.json
     await saveCurrentFabric();
     
@@ -9004,6 +9023,8 @@ async function importOldFabric(file) {
 
 async function openFabric(dirHandle, name) {
     try {
+        await flushFabricSave(); // a save still waiting is written to its own canvas before this one opens
+        stateFabricHandle = null;
         currentFabricHandle = dirHandle;
         currentFabricName = name;
         currentSourcesHandle = await currentFabricHandle.getDirectoryHandle('sources', { create: true });
@@ -9060,7 +9081,8 @@ async function openFabric(dirHandle, name) {
         }
         
         prepareFabricState(loadedState);
-        
+        stateFabricHandle = dirHandle;
+
         homeScreen.classList.add('hidden');
         render();
     } catch (err) {
@@ -9069,48 +9091,111 @@ async function openFabric(dirHandle, name) {
     }
 }
 
+// Saving. saveCurrentFabric() asks for a save; the write happens 500 ms after the last ask.
+// The canvas folder and its state are taken when the save is asked for, not when the timer
+// fires, so a save asked for just before Home, or before another canvas opens, still lands in
+// its own fabric.json (it used to read currentFabricHandle late and find it already cleared).
+// Writes run one at a time through saveChain, so an older write can never finish after a
+// newer one. flushFabricSave() writes straight away and resolves once the write is done.
 let saveFabricTimeout = null;
+let pendingSave = null;          // { handle, state } waiting for the timer
+let saveChain = Promise.resolve();
+let savesWriting = 0;
+let lastSavedHandle = null;
+let lastSavedJson = null;        // what was last written, so an unchanged canvas is not written again
+let thumbnailWarnedFor = null;   // a thumbnail failure is reported once per canvas, not on every save
+// The canvas `state` was loaded into. While another canvas is still loading, `state` is the old
+// one, and a save then would write the old canvas into the new canvas's fabric.json.
+let stateFabricHandle = null;
+
 async function saveCurrentFabric() {
+    if (!currentFabricHandle || currentFabricHandle !== stateFabricHandle) return;
+    // A save still waiting for another canvas is written now rather than replaced.
+    if (pendingSave && pendingSave.handle !== currentFabricHandle) flushFabricSave();
     if (saveFabricTimeout) clearTimeout(saveFabricTimeout);
-    saveFabricTimeout = setTimeout(async () => {
-        const handle = currentFabricHandle;
-        if (!handle) return;
-        try {
-            const fileHandle = await handle.getFileHandle('fabric.json', { create: true });
+    pendingSave = { handle: currentFabricHandle, state };
+    saveFabricTimeout = setTimeout(flushFabricSave, 500);
+}
+
+function flushFabricSave() {
+    if (saveFabricTimeout) { clearTimeout(saveFabricTimeout); saveFabricTimeout = null; }
+    const job = pendingSave;
+    pendingSave = null;
+    if (job) saveChain = saveChain.then(() => writeFabric(job.handle, job.state));
+    return saveChain;
+}
+
+// True when something is being written, or waiting to be written that differs from disk.
+function hasUnsavedFabric() {
+    if (savesWriting > 0) return true;
+    if (!pendingSave) return false;
+    return pendingSave.handle !== lastSavedHandle || JSON.stringify(pendingSave.state, null, 2) !== lastSavedJson;
+}
+
+async function writeFabric(handle, fabricState) {
+    const json = JSON.stringify(fabricState, null, 2);
+    if (handle === lastSavedHandle && json === lastSavedJson) return;
+    // The thumbnail is taken from the screen, so only while this canvas is still the one shown.
+    const thumbCanvas = (fabricState === state && handle === currentFabricHandle) ? drawFabricThumbnail(handle) : null;
+    savesWriting++;
+    try {
+        const fileHandle = await handle.getFileHandle('fabric.json', { create: true });
         const writable = await fileHandle.createWritable();
-        await writable.write(JSON.stringify(state, null, 2));
+        await writable.write(json);
         await writable.close();
-        
-        try {
-            const thumbSize = 300;
-            const aspect = canvas.height / canvas.width;
-            const thumbCanvas = document.createElement('canvas');
-            thumbCanvas.width = thumbSize;
-            thumbCanvas.height = thumbSize * aspect;
-            const tCtx = thumbCanvas.getContext('2d');
-            tCtx.fillStyle = state.fabricColor || '#1a1a1a';
-            tCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
-            tCtx.drawImage(bgCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-            tCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
-            
-            const blob = await new Promise(resolve => thumbCanvas.toBlob(resolve, 'image/jpeg', 0.6));
-            if (blob) {
-                const thumbHandle = await handle.getFileHandle('thumbnail.jpg', { create: true });
-                const thumbWritable = await thumbHandle.createWritable();
-                await thumbWritable.write(blob);
-                await thumbWritable.close();
-            }
-        } catch (e) {
-            console.warn('Could not save thumbnail', e); alert('Thumbnail error: ' + e.message);
-        }
+        lastSavedHandle = handle;
+        lastSavedJson = json;
+        if (thumbCanvas) await writeFabricThumbnail(handle, thumbCanvas);
     } catch (err) {
         console.warn('Could not save fabric:', err);
+    } finally {
+        savesWriting--;
     }
-    }, 500);
+}
+
+function drawFabricThumbnail(handle) {
+    try {
+        if (_renderScheduled) render(); // a change made a moment ago is in the picture too
+        const thumbSize = 300;
+        const aspect = canvas.height / canvas.width;
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = thumbSize;
+        thumbCanvas.height = thumbSize * aspect;
+        const tCtx = thumbCanvas.getContext('2d');
+        tCtx.fillStyle = state.fabricColor || '#1a1a1a';
+        tCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+        tCtx.drawImage(bgCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        tCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+        return thumbCanvas;
+    } catch (e) {
+        warnThumbnailFailed(handle, e);
+        return null;
+    }
+}
+
+async function writeFabricThumbnail(handle, thumbCanvas) {
+    try {
+        const blob = await new Promise(resolve => thumbCanvas.toBlob(resolve, 'image/jpeg', 0.6));
+        if (blob) {
+            const thumbHandle = await handle.getFileHandle('thumbnail.jpg', { create: true });
+            const thumbWritable = await thumbHandle.createWritable();
+            await thumbWritable.write(blob);
+            await thumbWritable.close();
+        }
+    } catch (e) {
+        warnThumbnailFailed(handle, e);
+    }
+}
+
+// [CHANGED on 2026-10-29]: alert('Thumbnail error: ...') on every save → one console warning per canvas.
+function warnThumbnailFailed(handle, e) {
+    if (thumbnailWarnedFor === handle) return;
+    thumbnailWarnedFor = handle;
+    console.warn('Could not save thumbnail', e);
 }
 
 btnHome.addEventListener('click', async () => {
-    await saveCurrentFabric();
+    await flushFabricSave(); // write the last edits before the canvas is let go
     currentFabricHandle = null;
     currentSourcesHandle = null;
     currentFabricName = null;
@@ -9228,13 +9313,31 @@ setInterval(() => {
     }
 }, 1000);
 
-window.addEventListener('beforeunload', async () => {
+window.addEventListener('beforeunload', (e) => {
+    // Checked first and synchronously: the browser asks "Leave site?" only if told before the handler returns.
+    const unsaved = hasUnsavedFabric();
+    flushFabricSave();
     if (targetWorkspaceHandle) {
-        try { await removeLockFile(targetWorkspaceHandle); } catch {}
+        removeLockFile(targetWorkspaceHandle);
     }
-    if (currentFabricHandle) {
-        try { saveCurrentFabric(); } catch {}
+    // A write cannot be relied on to finish once the page is gone, so while one is still
+    // waiting or running the browser asks first; choosing to stay lets it finish.
+    if (unsaved) {
+        e.preventDefault();
+        e.returnValue = '';
     }
+});
+
+// Leaving the tab (switching away, minimising, closing) writes at once instead of 500 ms later.
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushFabricSave();
+});
+window.addEventListener('pagehide', () => flushFabricSave());
+
+// Safety net: every input that ends while a canvas is open asks for a save, so a change whose
+// own code forgot to ask is still written. writeFabric skips a save that would change nothing.
+['pointerup', 'keyup', 'change', 'drop', 'paste', 'wheel'].forEach(type => {
+    document.addEventListener(type, () => saveCurrentFabric(), { capture: true, passive: true });
 });
 
 // Initialize folder handle restoration
