@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+
+# Local Claude Code settings
+.claude/settings.local.json
+
+# GitX: share the commit graph, keep thoughts and setup files private
+.gitx/*
+!.gitx/commits/

@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spatial File Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=1030">
+
+    
+    <!-- PWA Configuration -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    
+    <!-- Dashboard Edit Popup Modal -->
+    <div id="dashboard-edit-modal" style="display: none;">
+        <!-- Dark backdrop -->
+        <div id="dashboard-edit-backdrop"></div>
+        <!-- Popup container -->
+        <div id="dashboard-edit-popup">
+            <!-- Topbar (Glassmorphic) -->
+            <div id="dashboard-edit-topbar">
+                <div class="de-title">Dashboard Editor</div>
+                <div class="de-tools">
+                    <button class="de-tool-btn active" id="btn-edit-tool-select" title="Select / Move">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3M2 12h20M12 2v20"/></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-pan" title="Pan Canvas">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v4M14 11V4a2 2 0 0 0-4 0v6M10 11V5a2 2 0 0 0-4 0v7M6 14v-2a2 2 0 0 0-4 0v6a8 8 0 0 0 8 8h2a8 8 0 0 0 8-8v-7a2 2 0 0 0-4 0"/></svg>
+                    </button>
+                    <div class="de-divider"></div>
+                    <button class="de-tool-btn" id="btn-edit-tool-draw" title="Draw Pencil">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-text" title="Add Text">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-notepad" title="Note">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    </button>
+                    <div class="de-divider"></div>
+                    <button class="de-tool-btn" id="btn-edit-tool-progress-bar" title="Progress Bar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="10" width="20" height="6" rx="3" ry="3"></rect><rect x="2" y="10" width="12" height="6" rx="3" ry="3" fill="currentColor"></rect></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-clock" title="Clock">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-calendar" title="Calendar">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-dashboard-box" title="Dashboard Box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-box" title="Draw Box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                    </button>
+                    <button class="de-tool-btn" id="btn-edit-tool-table" title="Add Table">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+            </button>
+            <button class="de-tool-btn" id="btn-edit-tool-scroll-box" title="Scroll Box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="3" ry="3"></rect><circle cx="9" cy="18" r="1.5" fill="currentColor"></circle><circle cx="12" cy="18" r="1.5" fill="currentColor"></circle><circle cx="15" cy="18" r="1.5" fill="currentColor"></circle></svg>
+            </button>
+                </div>
+                <button id="btn-exit-dashboard-edit" class="de-done-btn">Done</button>
+            </div>
+            <!-- Body -->
+            <div id="dashboard-edit-body">
+                <!-- Canvas view area — the main canvas shows through here -->
+                <div id="dashboard-edit-canvas-area"></div>
+                <!-- Sidepanel (Glassmorphic) -->
+                <div id="dashboard-edit-sidepanel">
+                    <div class="de-section">
+                        <h4>Extra Options</h4>
+                        <div class="de-option-row">
+                            <label>Background</label>
+                            <input type="color" id="de-opt-bg" value="#1e1e1e">
+                        </div>
+                        <div class="de-option-row">
+                            <label>Grid Size</label>
+                            <input type="range" id="de-opt-grid" min="10" max="100" value="40">
+                        </div>
+                        <div class="de-option-row">
+                            <label>Snap to Grid</label>
+                            <input type="checkbox" id="de-opt-snap" checked>
+                        </div>
+                        <button class="de-apply-btn" id="de-opt-apply">Apply Theme</button>
+                    </div>
+                    <div class="de-section" id="pages-section" style="display: none;">
+                        <h4>Pages</h4>
+                        <div id="pages-list-container" class="pages-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home Screen Overlay -->
+    <div id="home-screen" class="home-screen">
+        <div class="home-header">
+            <h1>Fabric Workspace</h1>
+            <div class="home-actions">
+                <button id="btn-open-workspace" class="home-btn primary">Open Target Workspace</button>
+            </div>
+        </div>
+        
+        <div id="workspace-content" class="workspace-content hidden">
+            <div class="workspace-header">
+                <h2 id="workspace-path-label">Workspace: Not Selected</h2>
+                <button id="btn-new-fabric" class="home-btn accent">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Whiteboard
+                </button>
+            </div>
+            <div id="fabrics-grid" class="fabrics-grid">
+                <!-- Fabric Cards injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- New Fabric / Import Modal -->
+    <div id="new-fabric-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Create New Fabric</h3>
+            <div class="modal-body">
+                <label>Fabric Name</label>
+                <input type="text" id="new-fabric-name" placeholder="e.g. Brainstorming" />
+                
+                <label>Background Color</label>
+                <select id="new-fabric-bg">
+                    <option value="#ffffff">White</option>
+                    <option value="#1a1a1a" selected>Black</option>
+                </select>
+
+                <div class="modal-separator"><span>OR</span></div>
+                
+                <label class="import-label">Import Old Project</label>
+                <input type="file" id="import-fabric-file" accept=".json" class="file-input-btn" />
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-fabric" class="home-btn">Cancel</button>
+                <button id="btn-create-fabric" class="home-btn accent">Create Fabric</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toolbar">
+        <div class="tool-group">
+            <button id="btn-select" class="tool-btn active" title="Select (V)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3M2 12h20M12 2v20"/></svg>
+            </button>
+            <button class="tool-btn" id="btn-pan" title="Pan (H)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v4M14 11V4a2 2 0 0 0-4 0v6M10 11V5a2 2 0 0 0-4 0v7M6 14v-2a2 2 0 0 0-4 0v6a8 8 0 0 0 8 8h2a8 8 0 0 0 8-8v-7a2 2 0 0 0-4 0"/></svg>
+            </button>
+            <button class="tool-btn" id="btn-draw" title="Pencil / Area (P)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+            </button>
+            <button class="tool-btn" id="btn-delete" title="Eraser / Delete Area (E)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+            </button>
+            <button class="tool-btn" id="btn-text" title="Text Note (T)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+            </button>
+            <button class="tool-btn" id="btn-notepad" title="Notepad (N)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </button>
+            <button id="btn-line" class="tool-btn" title="Line (L)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+            </button>
+            <button id="btn-arrow" class="tool-btn" title="Arrow (A)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="12 5 19 5 19 12"/></svg>
+            </button>
+            <button id="btn-rect" class="tool-btn" title="Rectangle (R)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+            </button>
+            <button id="btn-book" class="tool-btn" title="Book">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+            </button>
+            <button id="btn-folder" class="tool-btn" title="Folder (F)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </button>
+            <button id="btn-circle" class="tool-btn" title="Circle (C)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+            </button>
+            <button id="btn-totem" class="tool-btn" title="Totem Marker (M)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M8 6h8M6 12h12M8 18h8"/></svg>
+            </button>
+            <button id="btn-elements" class="tool-btn" title="Dashboard Creator">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </button>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-group">
+            <button id="btn-home" class="tool-btn" title="Home / Workspaces">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </button>
+        </div>
+        
+        <div class="separator"></div>
+
+        <div class="tool-group">
+            <div class="color-dropdown" id="dropdown-fabric" title="Fabric Background Color">
+                <label>Fabric</label>
+                <div class="color-indicator" id="indicator-fabric" style="background: #1a1a1a;"></div>
+            </div>
+            <div class="color-dropdown" id="dropdown-area" title="Area Color">
+                <label>Area</label>
+                <div class="color-indicator" id="indicator-area" style="background: #4f46e5;"></div>
+            </div>
+            <div class="color-dropdown" id="dropdown-settings" title="Settings">
+                <label>Settings</label>
+                <div style="display: flex; justify-content: center; align-items: center; width: 24px; height: 24px; border-radius: 4px; background: rgba(255,255,255,0.1); cursor: pointer;" id="btn-settings-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Popup -->
+    <div id="settings-popup" style="position: fixed; display: none; background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(10px); border: 1px solid #333; border-radius: 8px; padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 2000;">
+        <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #d1d5db;">Graphics Preset</h4>
+        <select id="graphics-preset-select" style="width: 100%; background: #1a1a1a; color: white; border: 1px solid #333; border-radius: 4px; padding: 4px; font-size: 12px; cursor: pointer; margin-bottom: 12px;">
+            <option value="performance">Performance</option>
+            <option value="efficient">Efficient</option>
+        </select>
+        <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #d1d5db;">Input</h4>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #d1d5db; margin-bottom: 12px; cursor: pointer;" title="Reserves finger touches for gestures (2-finger pan, 2-finger tap for options, 3-finger swipe for Mission Control / Constellation / Widgets) so a stylus can be used for all clicking, dragging, and drawing.">
+            <input type="checkbox" id="tablet-mode-toggle" style="cursor: pointer;">
+            Tablet Mode (touch + stylus)
+        </label>
+        <button id="btn-check-gpu" style="width: 100%; background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 12px; cursor: pointer;">Check GPU Status</button>
+    </div>
+
+    <!-- Custom 20-color preset palette -->
+    <div id="color-palette-popup" class="color-palette-popup"></div>
+    
+    <!-- Select Properties Ribbon -->
+    <div id="select-ribbon" class="properties-panel hidden">
+        <div class="tool-group">
+            <button id="btn-select-normal" class="tool-btn active" title="Normal Select">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3M2 12h20M12 2v20"/></svg>
+                <span style="margin-left: 6px; font-size: 13px; font-weight: 500;">Normal</span>
+            </button>
+            <button id="btn-select-lasso" class="tool-btn" title="Lasso / Group Selection">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span style="margin-left: 6px; font-size: 13px; font-weight: 500;">Lasso</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Text Properties Ribbon -->
+    <div id="properties-panel" class="properties-panel hidden">
+        <div class="tool-group">
+            <div class="color-dropdown dropdown-labeled">
+                <label>Text Size</label>
+                <div class="slider-row" style="gap: 4px;">
+                    <input type="number" id="prop-font-size" min="12" max="500" value="24" style="width: 50px; background: #1a1a1a; color: white; border: 1px solid #333; border-radius: 4px; padding: 2px 4px; font-size: 12px; outline: none;">
+                    <span id="prop-font-size-val">px</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="tool-group">
+            <div class="color-dropdown dropdown-labeled">
+                <label>Font Family</label>
+                <select id="prop-font-family">
+                    <option value="Inter, sans-serif">Inter (Sans)</option>
+                    <option value="Georgia, serif">Georgia (Serif)</option>
+                    <option value="'Courier New', monospace">Courier (Mono)</option>
+                    <option value="Comic Sans MS, cursive">Comic (Casual)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="tool-group text-style-group">
+            <button class="prop-toggle-btn" id="prop-text-bold" title="Bold">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+            </button>
+            <button class="prop-toggle-btn" id="prop-text-italic" title="Italic">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+            </button>
+        </div>
+        
+        <div class="separator"></div>
+
+        <div class="tool-group text-style-group">
+            <button class="prop-toggle-btn active" id="prop-text-align-left" title="Align Left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+            </button>
+            <button class="prop-toggle-btn" id="prop-text-align-center" title="Align Center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
+            </button>
+            <button class="prop-toggle-btn" id="prop-text-align-right" title="Align Right">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+            </button>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="tool-group text-style-group">
+            <button class="prop-toggle-btn" id="prop-text-border" title="Text Border">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+            </button>
+        </div>
+        
+        <div class="separator"></div>
+        
+        <div class="tool-group">
+            <div class="color-dropdown" id="dropdown-text-color" title="Text Color">
+                <label>Text</label>
+                <div class="color-indicator" id="indicator-text-color" style="background: #ffffff;"></div>
+            </div>
+            <div class="color-dropdown" id="dropdown-highlight-color" title="Highlighter Background">
+                <label>Highlight</label>
+                <div class="color-indicator transparent-pattern" id="indicator-highlight-color" style="background: transparent;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Management Ribbon Removed in favor of Home Screen -->
+
+    <!-- Obsolete project panels removed -->
+
+    <!-- Book Selection Ribbon -->
+    <div id="book-ribbon-panel" class="properties-panel project-name-ribbon hidden">
+        <div class="tool-group">
+            <div class="color-dropdown dropdown-labeled">
+                <label>Select Book</label>
+                <select id="book-selector">
+                    <!-- Options populated dynamically -->
+                </select>
+            </div>
+            <div class="separator"></div>
+            <button class="project-action-btn project-save-btn" id="btn-confirm-book" title="Place Selected Book">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Place Book
+            </button>
+            <button class="project-action-btn" id="btn-new-book-mode" title="Create New Book Name">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> New Book
+            </button>
+            <button class="project-action-btn project-delete-btn" id="btn-delete-global-book" title="Delete Book Everywhere">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg> Delete Book
+            </button>
+            <button class="project-action-btn" id="btn-cancel-book-ribbon" title="Cancel">
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- Book Name Input Ribbon -->
+    <div id="book-name-panel" class="properties-panel project-name-ribbon hidden">
+        <div class="tool-group">
+            <div class="color-dropdown dropdown-labeled">
+                <label>New Book Name</label>
+                <input type="text" id="book-name-input" class="project-name-input" placeholder="Enter book name...">
+            </div>
+            <div class="separator"></div>
+            <button class="project-action-btn project-save-btn" id="btn-create-book" title="Create New Book">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Create Book
+            </button>
+            <button class="project-action-btn" id="btn-cancel-book-name" title="Back to Selection">
+                Back
+            </button>
+        </div>
+    </div>
+    <!-- Dashboard Creator Ribbon -->
+    <div id="elements-ribbon-panel" class="properties-panel project-name-ribbon hidden">
+        <div class="tool-group">
+            <span class="ribbon-label">Dashboard Creator</span>
+            <button class="tool-btn" id="btn-tool-progress-bar" title="Progress Bar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="10" width="20" height="6" rx="3" ry="3"></rect>
+                    <rect x="2" y="10" width="12" height="6" rx="3" ry="3" fill="currentColor"></rect>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-clock" title="Clock">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-calendar" title="Calendar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-dashboard-box" title="Dashboard Box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-box" title="Box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-table" title="Table">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                    <line x1="3" y1="15" x2="21" y2="15"></line>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                    <line x1="15" y1="3" x2="15" y2="21"></line>
+                </svg>
+            </button>
+            <button class="tool-btn" id="btn-tool-scroll-box" title="Scroll Box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="18" rx="3" ry="3"></rect>
+                    <circle cx="9" cy="18" r="1.5" fill="currentColor"></circle>
+                    <circle cx="12" cy="18" r="1.5" fill="currentColor"></circle>
+                    <circle cx="15" cy="18" r="1.5" fill="currentColor"></circle>
+                </svg>
+            </button>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-group">
+            <button class="project-action-btn" id="btn-cancel-elements" title="Close Elements Ribbon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Close
+            </button>
+        </div>
+    </div>
+    
+    <!-- Table Config Ribbon -->
+    <div id="table-config-ribbon-panel" class="properties-panel project-name-ribbon hidden">
+        <div class="tool-group">
+            <span class="ribbon-label">Table Options</span>
+            <div class="tool-input-group">
+                <label for="table-rows-input">Rows</label>
+                <input type="number" id="table-rows-input" min="1" max="20" value="3" class="color-input">
+            </div>
+            <div class="tool-input-group">
+                <label for="table-cols-input">Cols</label>
+                <input type="number" id="table-cols-input" min="1" max="20" value="3" class="color-input">
+            </div>
+        </div>
+        <div class="separator"></div>
+        <div class="tool-group">
+            <button class="project-action-btn" id="btn-cancel-table" title="Cancel Table">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Cancel
+            </button>
+        </div>
+    </div>
+
+    <!-- Eraser Ribbon -->
+    <div id="eraser-ribbon-panel" class="properties-panel hidden">
+        <div class="tool-group text-style-group">
+            <span class="ribbon-label">Eraser Mode</span>
+            <button class="prop-toggle-btn active" id="btn-eraser-normal" title="Normal Eraser">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+            </button>
+            <button class="prop-toggle-btn" id="btn-eraser-lines" title="Erase Lines Only">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><path d="m15 15 4 4"/><path d="m5 5 4 4"/></svg>
+            </button>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="tool-group">
+            <button class="project-action-btn" id="btn-cancel-eraser" title="Close Eraser Ribbon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Pen Ribbon -->
+    <div id="pen-ribbon-panel" class="properties-panel hidden">
+        <div class="tool-group">
+            <span class="ribbon-label">Pen Color</span>
+            <div id="pen-color-palette" class="inline-color-palette"></div>
+        </div>
+    </div>
+
+    <div class="instructions">
+        <span id="instruction-text">Drag to pan, scroll to zoom. Drop files anywhere.</span>
+    </div>
+
+    <!-- Workspace (Canvas + DOM Elements) -->
+    <div id="workspace">
+        <canvas id="fabric-canvas"></canvas>
+        <canvas id="ink-canvas"></canvas>
+        <!-- Render surface for DOM elements (files, notes) -->
+        <div id="files-layer"></div>
+        <div id="selection-overlay"></div>
+        <!-- Off-screen totem direction indicators: small edge arrows pointing toward totems
+             currently outside the viewport, click to jump the camera to that totem. -->
+        <div id="totem-indicators"></div>
+
+        <!-- Drop zone overlay -->
+        <div id="drop-overlay">
+            <div class="drop-message">Drop file to place it on the fabric</div>
+        </div>
+
+
+    </div>
+
+    <!-- Templates -->
+    <template id="tpl-notepad">
+        <div class="notepad-app">
+            <textarea class="notepad-textarea" spellcheck="false"></textarea>
+            <div class="notepad-footer">
+                <span class="notepad-status">Characters: <span class="char-count">0</span></span>
+                <div class="notepad-controls">
+                    <button class="icon-btn wrap-toggle" title="Toggle Word Wrap">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                    </button>
+                    <button class="icon-btn display-toggle" title="Toggle Sticky Mode">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    </button>
+                    <button class="icon-btn font-decrease" title="Decrease Font Size">A-</button>
+                    <button class="icon-btn font-increase" title="Increase Font Size">A+</button>
+                    <button class="icon-btn close-notepad" title="Close Notepad">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Fabric Context Menu -->
+    <div id="fabric-context-menu" class="hidden">
+        <button id="btn-rename-fabric">Rename</button>
+        <button id="btn-delete-fabric" class="danger">Delete</button>
+    </div>
+    
+    <!-- Table Context Menu -->
+    <div id="table-context-menu" class="hidden" style="position: absolute; z-index: 9999; background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column; padding: 4px 0; min-width: 150px;">
+        <div class="context-menu-item" id="menu-resize-table" style="padding: 8px 16px; cursor: pointer; font-size: 14px; color: var(--text-color);">Resize Table</div>
+        <div class="context-menu-item" id="menu-delete-table" style="padding: 8px 16px; cursor: pointer; font-size: 14px; color: #ef4444;">Delete Table</div>
+    </div>
+
+
+
+    <!-- Upload Progress Ribbon -->
+    <div id="upload-progress-ribbon" class="hidden">
+        <div class="progress-info">
+            <span class="progress-spinner">⏳</span>
+            <span id="progress-text">Importing files...</span>
+        </div>
+        <div class="progress-bar-container">
+            <div id="progress-bar-fill"></div>
+        </div>
+        <span id="progress-count">0 / 0</span>
+    </div>
+
+    <!-- Edge Screen Sidebar: shows a canvas folder area's contents (opened via double-click) -->
+    <div id="edge-sidebar" class="side-panel">
+        <div id="edge-sidebar-header" class="side-panel-header">
+            <h3 id="edge-sidebar-title" class="side-panel-title">Folder Name</h3>
+            <div style="flex: 1;"></div>
+            <button id="edge-sidebar-edit-mode" class="side-panel-edit-btn" onclick="toggleEdgeSidebarEditMode()">Edit</button>
+            <button id="edge-sidebar-close" class="side-panel-icon-btn" onclick="closeSidePanel('edge')" title="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div id="edge-sidebar-content" class="side-panel-content">
+            <!-- List items injected here -->
+        </div>
+    </div>
+
+    <!-- Widget Sidebar (Shift+S): customizable, screen-fixed panel independent of the canvas -->
+    <div id="widget-sidebar" class="side-panel">
+        <div id="widget-sidebar-header" class="side-panel-header">
+            <h3 id="widget-sidebar-title" class="side-panel-title">Widgets</h3>
+            <div style="flex: 1;"></div>
+            <button id="widget-sidebar-add" class="side-panel-icon-btn" onclick="openWidgetAddMenu(event)" title="Add widget">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button id="widget-sidebar-edit-mode" class="side-panel-edit-btn" onclick="toggleWidgetSidebarEditMode()">Edit</button>
+            <button id="widget-sidebar-close" class="side-panel-icon-btn" onclick="closeSidePanel('widgets')" title="Close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div id="widget-sidebar-content" class="side-panel-content">
+            <!-- Widget cards injected here -->
+        </div>
+        <div id="widget-add-menu" class="hidden"></div>
+    </div>
+
+    <!-- Mission Control Overlay -->
+    <div id="mission-control-overlay" class="hidden">
+        <div class="mc-grid" id="mc-grid"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="script.js?v=1062"></script>
+    <script>
+        // Setup global error handling to notify user if script fails to load/parse
+        window.addEventListener('error', function(e) {
+            if (e.filename && e.filename.includes('script.js')) {
+                console.error("Syntax or load error in script.js:", e.message, "at line", e.lineno);
+                document.getElementById('instruction-bar').textContent = `ERROR loading script.js: ${e.message} (Line ${e.lineno})`;
+                document.getElementById('instruction-bar').style.color = '#ef4444';
+            }
+        });
+
+        // Register service worker for standalone PWA capabilities
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js?v=1048').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }).catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

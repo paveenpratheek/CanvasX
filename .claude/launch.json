@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "file-fabric",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "9075"],
+      "port": 9075
+    }
+  ]
+}
