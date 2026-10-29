@@ -112,14 +112,14 @@ knowledge/        the project's own append-only records: code map, progress, dec
 
 ## Works with ter-manager
 
-CanvasX runs as its own web app. Its canvases connect to the rest of the system through **ter-manager**, where the **NoteX** and **RAGX** plugins run. NoteX, inside ter-manager, reads every canvas in your workspace, keeps the ones you choose in RAGX automatically, and writes AI agents' scripts onto canvases whenever CanvasX isn't holding them open. So what you lay out in CanvasX can be searched, cited and added to by AI, without CanvasX itself changing.
+CanvasX runs as its own web app. Its canvases connect to the rest of the system through **ter-manager** (my own terminal and workspace manager, not public yet), where the **NoteX** and **RAGX** plugins run. NoteX, inside ter-manager, reads every canvas in your workspace, keeps the ones you choose in RAGX automatically, and writes AI agents' scripts onto canvases whenever CanvasX isn't holding them open. So what you lay out in CanvasX can be searched, cited and added to by AI, without CanvasX itself changing.
 
 ## GitX ready
 
 This repository is set up for the **GitX workflow**, so any AI coding agent that opens it works the same disciplined way:
 
 - `AGENTS.md` holds the project's rules and the workflow once; `CLAUDE.md` and `GEMINI.md` import it, so **Claude Code** and **Google Antigravity** both follow it.
-- The `gitx-workflow` skill ships in `.claude/skills/` and `.agents/skills/`, and a hook in `.claude/settings.json` checks the workflow after every edit and at the end of each turn.
+- The `gitx-workflow` skill ships in `.claude/skills/` and `.agents/skills/`, and a hook in `.claude/settings.json` checks the workflow after every edit and at the end of each turn, when GitX is installed on the machine (without it, the hook stays silent).
 - `GitX.md` is a **map of the code**: each feature, the code it owns and its known bugs, so an agent asks GitX instead of reading 11,000 lines from scratch.
 - Agents catch up on recorded decisions before changing anything, record new decisions as they happen, and commit with GitX trailers, so the reasoning behind every change travels with the code.
 

@@ -48,8 +48,8 @@ rejected ideas and open questions behind them. Ask GitX; do not work it out
 from scratch.
 
 - This folder is its own git repository. Pass it as `cwd` to every GitX tool.
-  (The parent folder, `E:/antigravity V1`, is a different repository that
-  happens to hold a copy.)
+  (CanvasX began as a copy of File Fabric, `E:/antigravity V1/file-fabric`,
+  which is a different repository with its own history.)
 - **Do not read `GitX.md` or any `.gitx` folder directly.** Ask GitX's tools.
   They hand out the part a task needs, checked against the code as it is now,
   and mark what has gone stale. The raw files are neither.
