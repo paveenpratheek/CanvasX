@@ -1453,6 +1453,53 @@ textarea, input, [contenteditable="true"] {
     color: #9ca3af;
 }
 
+/* A canvas assigned to the agent (t-2e289ba0da) */
+.fabric-card.agent-card .fabric-card-info p {
+    color: #a5b4fc;
+}
+
+/* An open agent canvas is view-only (t-75769978c3): only Pan and Home stay on the toolbar,
+   file cards and notes take no pointer so a drag over them pans, and the banner says why. */
+#agent-banner {
+    display: none;
+}
+body.agent-view #agent-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    position: fixed;
+    top: 96px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: min(560px, 92vw);
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: var(--panel-bg-solid);
+    border: 1px solid rgba(165, 180, 252, 0.35);
+    box-shadow: var(--shadow-pop);
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    z-index: 100;
+}
+body.agent-view #agent-banner strong {
+    color: #c7d2fe;
+    font-size: 13px;
+}
+body.agent-view #toolbar .tool-btn:not(#btn-pan):not(#btn-home),
+body.agent-view #toolbar .color-dropdown,
+body.agent-view #toolbar .tool-group:has(.color-dropdown),
+body.agent-view #toolbar .tool-group:has(#btn-home) + .separator,
+body.agent-view .instructions {
+    display: none !important;
+}
+body.agent-view #files-layer,
+body.agent-view #files-layer *,
+body.agent-view #selection-overlay {
+    pointer-events: none !important;
+}
+
 /* Modal UI */
 .modal-overlay {
     position: fixed;

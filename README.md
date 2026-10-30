@@ -64,6 +64,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 - Installable **PWA** with a network-first service worker
 - A home screen of fabrics with thumbnails
 - A lock file (`.fabric_lock`, refreshed every 10 s) so other tools know when a canvas is open
+- **Agent canvases**: assign an empty canvas to the agent from its menu on the home screen. NoteX then draws it from the agent's scripts. CanvasX shows it view-only, with only Pan and Home, and redraws it whenever NoteX changes it. Take it back from the agent to edit it yourself.
 
 ---
 
@@ -76,6 +77,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
     thumbnail.jpg    shown on the home screen
     sources/         copies of every file dropped on the canvas
     .fabric_lock     present while the canvas is open; refreshed every 10 s
+    agent.json       present when the canvas is assigned to the agent
 ```
 
 Because it is plain JSON in plain folders, other programs can read it. **NoteX** reads it to build AI-searchable documents, and writes agents' scripts into it only when the lock has gone stale.

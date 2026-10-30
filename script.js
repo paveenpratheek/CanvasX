@@ -8764,7 +8764,8 @@ let lockInterval = null;
 function startLockHeartbeat() {
     if (lockInterval) clearInterval(lockInterval);
     lockInterval = setInterval(() => {
-        if (currentFabricHandle) writeLockFile(currentFabricHandle);
+        // An agent canvas takes no lock: NoteX may draw it while it is shown (t-75769978c3).
+        if (currentFabricHandle && !agentCanvas) writeLockFile(currentFabricHandle);
     }, 10000); // refresh every 10s
 }
 
@@ -8825,6 +8826,7 @@ async function loadFabricsGrid() {
                 }
                 
                 if (isValid) {
+                    const assigned = await isAgentCanvas(dirHandle);
                     let thumbUrl = null;
                     try {
                         const thumbHandle = await dirHandle.getFileHandle('thumbnail.jpg');
@@ -8846,12 +8848,16 @@ async function loadFabricsGrid() {
                         e.preventDefault();
                         e.stopPropagation();
                         e.stopImmediatePropagation();
-                        showFabricContextMenu(e.clientX, e.clientY, entry.name);
+                        showFabricContextMenu(e.clientX, e.clientY, entry.name, assigned);
                     }, true);
-                    
+
                     const infoDiv = document.createElement('div');
                     infoDiv.className = 'fabric-card-info';
                     infoDiv.innerHTML = `<h3>${entry.name}</h3><p>Fabric</p>`;
+                    if (assigned) {
+                        card.classList.add('agent-card');
+                        infoDiv.querySelector('p').textContent = 'Agent canvas · view only';
+                    }
                     
                     card.appendChild(iconDiv);
                     card.appendChild(optionsBtn);
@@ -8909,6 +8915,7 @@ async function createAndLoadNewFabric(name, bgColor, importState = null) {
     newFabricModal.classList.add('hidden');
     await flushFabricSave(); // a save still waiting is written to its own canvas first
     stateFabricHandle = null;
+    agentCanvas = false; // a new canvas is the user's
 
     // Create folder and sources
     currentFabricHandle = await targetWorkspaceHandle.getDirectoryHandle(name, { create: true });
@@ -8923,8 +8930,9 @@ async function createAndLoadNewFabric(name, bgColor, importState = null) {
     
     // Hide home screen, load canvas
     homeScreen.classList.add('hidden');
-    
+
     render();
+    showAgentView();
 }
 
 function prepareFabricState(loadedState = null, bgColor = '#1a1a1a') {
@@ -9025,6 +9033,7 @@ async function openFabric(dirHandle, name) {
     try {
         await flushFabricSave(); // a save still waiting is written to its own canvas before this one opens
         stateFabricHandle = null;
+        agentCanvas = await isAgentCanvas(dirHandle); // known before anything could ask to save it
         currentFabricHandle = dirHandle;
         currentFabricName = name;
         currentSourcesHandle = await currentFabricHandle.getDirectoryHandle('sources', { create: true });
@@ -9085,6 +9094,7 @@ async function openFabric(dirHandle, name) {
 
         homeScreen.classList.add('hidden');
         render();
+        await showAgentView();
     } catch (err) {
         console.error('Failed to open fabric:', err);
         alert('Failed to open this Fabric: ' + (err.stack || err.message || err));
@@ -9110,6 +9120,7 @@ let stateFabricHandle = null;
 
 async function saveCurrentFabric() {
     if (!currentFabricHandle || currentFabricHandle !== stateFabricHandle) return;
+    if (agentCanvas) return; // NoteX writes an agent canvas, never CanvasX (t-75769978c3)
     // A save still waiting for another canvas is written now rather than replaced.
     if (pendingSave && pendingSave.handle !== currentFabricHandle) flushFabricSave();
     if (saveFabricTimeout) clearTimeout(saveFabricTimeout);
@@ -9199,9 +9210,94 @@ btnHome.addEventListener('click', async () => {
     currentFabricHandle = null;
     currentSourcesHandle = null;
     currentFabricName = null;
+    agentCanvas = false;
+    showAgentView();
     homeScreen.classList.remove('hidden');
     loadFabricsGrid();
 });
+
+// --- Agent canvases ---
+// A canvas assigned to the agent holds an agent.json in its folder (t-2e289ba0da). NoteX draws it
+// from the agent's totem scripts, so CanvasX shows it view-only: only Pan and Home, nothing saved,
+// no lock, and it is drawn again whenever NoteX rewrites its fabric.json (t-75769978c3).
+let agentCanvas = false;
+let agentWatch = null;
+let agentSeenModified = 0;
+
+async function isAgentCanvas(dirHandle) {
+    try { await dirHandle.getFileHandle('agent.json'); return true; } catch { return false; }
+}
+
+async function fabricFile(dirHandle) {
+    try { return await (await dirHandle.getFileHandle('fabric.json')).getFile(); } catch { return null; }
+}
+
+// Only an empty canvas can be assigned, so the user's own items are never drawn over (t-a4c5eb74fc).
+async function isEmptyFabric(dirHandle) {
+    try {
+        const s = JSON.parse(await (await fabricFile(dirHandle)).text());
+        const d = s.data ? s.data : s;
+        return ['drawings', 'areas', 'files', 'links', 'totems', 'tables', 'sidebarWidgets'].every(k => !(d[k] && d[k].length));
+    } catch {
+        return false; // unreadable is not known to be empty
+    }
+}
+
+async function showAgentView() {
+    document.body.classList.toggle('agent-view', agentCanvas);
+    if (agentWatch) { clearInterval(agentWatch); agentWatch = null; }
+    if (!agentCanvas) return;
+    setMode('pan');
+    const handle = currentFabricHandle;
+    const seen = await fabricFile(handle);
+    agentSeenModified = seen ? seen.lastModified : 0;
+    agentWatch = setInterval(async () => {
+        if (currentFabricHandle !== handle || state.isPanning) return;
+        const file = await fabricFile(handle);
+        if (!file || file.lastModified === agentSeenModified) return;
+        // Drawn only once the file reads whole; a half-written one is tried again in 3 s.
+        try { JSON.parse(await file.text()); } catch { return; }
+        agentSeenModified = file.lastModified;
+        const camera = { ...state.camera };
+        await openFabric(handle, currentFabricName);
+        state.camera = camera; // the view stays where the user left it
+        render();
+    }, 3000);
+}
+
+// What would change an agent canvas is stopped before CanvasX's own handlers see it: every key but
+// Space and Escape, drops, pastes, double-clicks, right-clicks and buttons other than the left.
+// File cards and notes take no pointer at all (style.css), so a drag over them pans.
+window.addEventListener('keydown', (e) => {
+    if (!agentCanvas || e.key === ' ' || e.key === 'Escape') return;
+    e.stopImmediatePropagation();
+}, true);
+for (const type of ['drop', 'paste', 'dblclick', 'contextmenu', 'pointerdown']) {
+    window.addEventListener(type, (e) => {
+        if (!agentCanvas || (type === 'pointerdown' && e.button === 0)) return;
+        if (e.target.closest && e.target.closest('#toolbar, #agent-banner, #totem-indicators')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }, true);
+}
+
+async function setAgentCanvas(name, assign) {
+    const dir = await targetWorkspaceHandle.getDirectoryHandle(name);
+    if (!assign) {
+        if (!confirm(`Take '${name}' back from the agent?\n\nIt becomes your canvas again, holding what NoteX last drew, and NoteX stops drawing it.`)) return;
+        await dir.removeEntry('agent.json');
+        return;
+    }
+    if (!(await isEmptyFabric(dir))) {
+        alert(`'${name}' already holds items, so it cannot be assigned to the agent: NoteX would draw over them from the agent's scripts.\n\nCreate a new fabric for the agent instead.`);
+        return;
+    }
+    if (!confirm(`Assign '${name}' to the agent?\n\nNoteX will draw it from the agent's scripts, and here it opens view-only. You can take it back later.`)) return;
+    const fh = await dir.getFileHandle('agent.json', { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify({ assignedAt: new Date().toISOString(), by: 'CanvasX' }, null, 2));
+    await w.close();
+}
 
 // Copy a dropped file into the directory
 async function copyFileToFolder(file, fileData) {
@@ -9815,7 +9911,7 @@ function syncNotesDOM() {
 init();
 let activeContextFabric = null;
 
-function showFabricContextMenu(x, y, fabricName) {
+function showFabricContextMenu(x, y, fabricName, assigned = false) {
     activeContextFabric = fabricName;
     // Remove any existing dynamic menu
     const old = document.getElementById('dynamic-fabric-menu');
@@ -9874,7 +9970,22 @@ function showFabricContextMenu(x, y, fabricName) {
         } catch (err) { console.error(err); alert('Failed to delete fabric.'); }
     };
     
+    const agentBtn = document.createElement('button');
+    agentBtn.textContent = assigned ? 'Take back from agent' : 'Assign to agent';
+    agentBtn.style.cssText = renameBtn.style.cssText;
+    agentBtn.onmouseenter = () => agentBtn.style.background = 'rgba(255,255,255,0.1)';
+    agentBtn.onmouseleave = () => agentBtn.style.background = 'transparent';
+    agentBtn.onclick = async (e) => {
+        e.stopPropagation();
+        menu.remove();
+        try {
+            await setAgentCanvas(activeContextFabric, !assigned);
+            loadFabricsGrid();
+        } catch (err) { console.error(err); alert('Failed to change who this fabric belongs to: ' + err.message); }
+    };
+
     menu.appendChild(renameBtn);
+    menu.appendChild(agentBtn);
     menu.appendChild(deleteBtn);
     document.body.appendChild(menu);
     
