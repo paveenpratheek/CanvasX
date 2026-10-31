@@ -6164,6 +6164,74 @@ function animateCamera() {
     }
 }
 
+// --- The canvas from the keyboard (t-732565e0d9) ---
+// The arrow keys pan and Shift+Up/Down zoom about the middle of the screen, at a steady speed for
+// as long as they are held (not a step per key repeat, which stutters - t-c4774cb18f); two arrows
+// pan diagonally. Shift+A puts the cursor in the agent chat, and Escape there gives the keys back.
+const KEY_PAN_SPEED = 900; // screen pixels a second
+const KEY_ZOOM_RATE = 1.4; // the zoom changes e^1.4 times (about 4x) a second
+const KEY_MOVES = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+const heldMoves = new Set();
+let keyShift = false;
+let keyMoveLast = 0;
+
+function canvasTakesKeys(e) {
+    if (e.ctrlKey || e.altKey || e.metaKey || !homeScreen.classList.contains('hidden')) return false;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
+    const mc = document.getElementById('mission-control-overlay');
+    return !(mc && !mc.classList.contains('hidden'));
+}
+
+// Zoom about the middle of the screen, within the wheel's limits, and not while a dashboard is edited.
+function keyZoom(factor) {
+    if (state.editingDashboardId) return;
+    const zoom = Math.min(Math.max(state.camera.zoom * factor, 0.25), 5);
+    const d = zoom / state.camera.zoom;
+    state.camera.x *= d;
+    state.camera.y *= d;
+    state.camera.zoom = zoom;
+}
+
+function keyMoveFrame(now) {
+    if (!heldMoves.size) { keyMoveLast = 0; return; }
+    const dt = keyMoveLast ? Math.min(0.1, (now - keyMoveLast) / 1000) : 1 / 60;
+    keyMoveLast = now;
+    let dx = 0, dy = 0;
+    for (const k of heldMoves) { dx += KEY_MOVES[k][0]; dy += KEY_MOVES[k][1]; }
+    state.camera.x += dx * KEY_PAN_SPEED * dt;
+    if (keyShift) keyZoom(Math.exp(dy * KEY_ZOOM_RATE * dt));
+    else state.camera.y += dy * KEY_PAN_SPEED * dt;
+    scheduleRender();
+    requestAnimationFrame(keyMoveFrame);
+}
+
+window.addEventListener('keydown', (e) => {
+    keyShift = e.shiftKey;
+    if (e.key === 'Escape' && e.target.id === 'agent-chat-text') { e.target.blur(); return; }
+    if (!canvasTakesKeys(e)) return;
+    if (KEY_MOVES[e.key]) {
+        e.preventDefault();
+        if (heldMoves.has(e.key)) return;
+        cameraAnim = null; // the keys take over from a camera flight
+        heldMoves.add(e.key);
+        if (heldMoves.size === 1) requestAnimationFrame(keyMoveFrame);
+        return;
+    }
+    if (e.shiftKey && e.key.toLowerCase() === 'a') {
+        const chat = document.getElementById('agent-chat');
+        if (!agentCanvas || !chat.getClientRects().length) return; // no chat here (and none in CanvasXP)
+        e.preventDefault();
+        if (chat.classList.contains('folded')) document.getElementById('agent-chat-fold').click();
+        document.getElementById('agent-chat-text').focus();
+    }
+});
+window.addEventListener('keyup', (e) => {
+    keyShift = e.shiftKey;
+    heldMoves.delete(e.key);
+});
+window.addEventListener('blur', () => { heldMoves.clear(); keyShift = false; });
+
 // Render coalescing: many code paths call scheduleRender() (often several within one
 // event handler or one frame). Without coalescing, each would queue its own rAF callback
 // and render() would run multiple times per frame for the same visual result. This flag
@@ -9437,11 +9505,13 @@ async function showAgentView() {
 // Space and Escape, drops, pastes, double-clicks, right-clicks and buttons other than the left.
 // File cards and notes take no pointer at all (style.css), so a drag over them pans.
 // Shortcuts that only change the view go through: Shift+R constellation, Shift+D Mission Control,
-// Shift+S widget sidebar, H pan (t-a3dd88c887).
+// Shift+S widget sidebar, H pan (t-a3dd88c887); and the arrows (pan, Shift+Up/Down zoom) and
+// Shift+A (to the chat), from the keyboard block by animateCamera (t-732565e0d9).
 function isViewShortcut(e) {
     if (e.ctrlKey || e.altKey || e.metaKey) return false;
     const k = String(e.key || '').toLowerCase();
-    return e.shiftKey ? ['r', 'd', 's'].includes(k) : k === 'h';
+    if (KEY_MOVES[e.key]) return true;
+    return e.shiftKey ? ['r', 'd', 's', 'a'].includes(k) : k === 'h';
 }
 
 window.addEventListener('keydown', (e) => {
