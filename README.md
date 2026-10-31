@@ -53,6 +53,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 
 **Organisation**
 - **Totems**: named groups that gather nearby areas, with Constellation mode (`Shift+R`) to see them all at once
+- **Sub-totems**: one level of groups inside a totem, such as a book's chapters or a game's cars. Right-click a totem and choose **Add sub-totem**, or let the agent write them. Boxes join the sub-totem they sit near; the label is smaller and ringed; Constellation mode links each sub-totem to its totem; moving a totem with its field takes its sub-totems along, and deleting a totem leaves its sub-totems as totems.
 - **Links**: corner-to-corner connections between areas
 - **Scroll boxes**: multi-page containers with animated page transitions
 - **Books**: named collections, kept on shelves shared by every canvas

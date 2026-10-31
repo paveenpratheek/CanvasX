@@ -5257,8 +5257,14 @@ function showTotemContextMenu(screenX, screenY, totem) {
     // Default radius to 0 if not set
     const currentRadius = totem.radius || 0;
     
+    const parentOfThis = isSubTotem(totem) ? state.totems.find(t => t.id === totem.parentTotemId) : null;
+    const header = parentOfThis ? `${totem.name} · sub-totem of ${parentOfThis.name}` : totem.name;
     menu.innerHTML = `
-        <div class="area-ctx-header">${totem.name}</div>
+        <div class="area-ctx-header">${header}</div>
+        ${parentOfThis ? '' : `<div class="area-ctx-item" data-action="add-sub">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"/><circle cx="18" cy="18" r="3"/><path d="M6 15a6 6 0 0 0 9 2.6"/><circle cx="6" cy="3" r="1"/></svg>
+            Add sub-totem
+        </div>`}
         <div class="area-ctx-item" data-action="rename">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Rename
@@ -5306,6 +5312,30 @@ function showTotemContextMenu(screenX, screenY, totem) {
     });
     
     // Action handlers
+    // A sub-totem starts below its totem's field, in its colour; boxes join it once it is moved
+    // beside them (t-62c6ed9e8b).
+    const addSub = menu.querySelector('[data-action="add-sub"]');
+    if (addSub) addSub.addEventListener('click', () => {
+        dismissTotemContextMenu();
+        const name = prompt(`Sub-totem of ${totem.name} - its name:`);
+        if (!name || !name.trim()) return;
+        const subs = subTotemsOf(totem);
+        const sub = {
+            id: Date.now() + Math.random().toString(36).substr(2, 5),
+            name: name.trim(),
+            color: totem.color || '#3b5a76',
+            radius: 0,
+            x: totem.x + subs.length * 600,
+            y: totem.y + 700,
+            isLocked: false,
+            parentTotemId: totem.id
+        };
+        state.totems.push(sub);
+        recalculateItemLinks();
+        saveCurrentFabric();
+        scheduleRender();
+    });
+
     menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
         dismissTotemContextMenu();
         const newName = prompt("Rename Totem:", totem.name);
@@ -5321,23 +5351,25 @@ function showTotemContextMenu(screenX, screenY, totem) {
         
         // Field radius is 500 (hardcoded in magnetic fields logic)
         const radius = 500;
+        // A totem moves with its sub-totems and what they hold (t-9b101d1e08).
+        const subIds = new Set(subTotemsOf(totem).map(t => t.id));
         
         // Include both logically linked items AND physically nearby items, including tables and other totems
         const linkedDrawings = state.drawings.filter(d => {
-            if (d.linkedTotemId === totem.id) return true;
+            if (d.linkedTotemId === totem.id || subIds.has(d.linkedTotemId)) return true;
             const bbox = getItemBBox(d);
             return bbox && distToBBox(totem.x, totem.y, bbox) <= radius;
         });
         
         const linkedAreas = state.areas.filter(a => {
-            if (a.linkedTotemId === totem.id) return true;
+            if (a.linkedTotemId === totem.id || subIds.has(a.linkedTotemId)) return true;
             const bbox = getItemBBox(a);
             return bbox && distToBBox(totem.x, totem.y, bbox) <= radius;
         });
         
         const linkedFiles = state.files.filter(f => {
             if (f.isHidden) return false;
-            if (f.linkedTotemId === totem.id) return true;
+            if (f.linkedTotemId === totem.id || subIds.has(f.linkedTotemId)) return true;
             const bbox = getItemBBox(f);
             return bbox && distToBBox(totem.x, totem.y, bbox) <= radius;
         });
@@ -5349,6 +5381,7 @@ function showTotemContextMenu(screenX, screenY, totem) {
         
         const linkedTotems = state.totems.filter(t => {
             if (t.id === totem.id) return false;
+            if (subIds.has(t.id)) return true;
             const bbox = getItemBBox(t);
             return bbox && distToBBox(totem.x, totem.y, bbox) <= radius;
         });
@@ -5387,6 +5420,8 @@ function showTotemContextMenu(screenX, screenY, totem) {
     
     menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
         dismissTotemContextMenu();
+        // Its sub-totems stay, as totems of their own (t-9b101d1e08).
+        for (const sub of subTotemsOf(totem)) delete sub.parentTotemId;
         state.totems = state.totems.filter(t => t.id !== totem.id);
         saveCurrentFabric();
         scheduleRender();
@@ -6730,8 +6765,11 @@ function computeMagneticClusters() {
     })).filter(d => d.bbox !== null);
     
     const queue = [];
-    
-    for (let totem of totems) {
+
+    // Sub-totems claim first, so a box within reach of a sub-totem and its totem goes to the
+    // sub-totem (t-9b101d1e08); the totem keeps what is near it alone.
+    const seeding = [...totems.filter(isSubTotem), ...totems.filter(t => !isSubTotem(t))];
+    for (let totem of seeding) {
         const c = parseHex(totem.color || '#3b5a76');
         activeMagneticFields.push({
             type: 'totem',
@@ -6944,6 +6982,31 @@ function drawGrid(width, height) {
 
 function drawConstellationLinks() {
     if (!state.totems || state.totems.length < 2) return;
+
+    // Each sub-totem is linked to its totem, as totems linked through their boxes are (t-cab82dd640).
+    for (const sub of state.totems.filter(isSubTotem)) {
+        const parent = state.totems.find(t => t.id === sub.parentTotemId);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(parent.x, parent.y);
+        ctx.lineTo(sub.x, sub.y);
+        ctx.strokeStyle = parent.color || '#3b5a76';
+        ctx.lineWidth = 6 / state.camera.zoom;
+        ctx.globalAlpha = 0.35;
+        ctx.stroke();
+        ctx.setLineDash([8 / state.camera.zoom, 6 / state.camera.zoom]);
+        ctx.lineWidth = 2 / state.camera.zoom;
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const end of [parent, sub]) {
+            ctx.beginPath();
+            ctx.arc(end.x, end.y, 4 / state.camera.zoom, 0, Math.PI * 2);
+            ctx.fillStyle = parent.color || '#3b5a76';
+            ctx.fill();
+        }
+        ctx.restore();
+    }
     
     let totemLinksMap = {};
     for (let link of state.links) {
@@ -7055,6 +7118,18 @@ function drawConstellationLinks() {
         ctx.restore();
     }
 }
+// --- Sub-totems ---
+// One level under a totem: a book's chapters, a game's cars. A sub-totem is a totem whose
+// parentTotemId names a totem that has no parent itself (t-62c6ed9e8b); boxes join it by
+// nearness, as they join totems (t-9b101d1e08).
+function isSubTotem(t) {
+    return Boolean(t && t.parentTotemId && state.totems.some(p => p.id === t.parentTotemId && !p.parentTotemId));
+}
+
+function subTotemsOf(totem) {
+    return state.totems.filter(t => t.parentTotemId === totem.id && isSubTotem(t));
+}
+
 function drawTotems() {
     for (let t of state.totems) {
         // Viewport culling (but never in constellation mode, which deliberately shows all totems).
@@ -7069,16 +7144,24 @@ function drawTotems() {
         ctx.fillStyle = t.color || '#3b5a76';
         ctx.beginPath();
         
-        ctx.font = `500 ${16 / state.camera.zoom}px Inter, sans-serif`;
+        // A sub-totem's label is smaller, ringed, in its totem's colour.
+        const sub = isSubTotem(t);
+        const fontPx = sub ? 13 : 16;
+        ctx.font = `500 ${fontPx / state.camera.zoom}px Inter, sans-serif`;
         const metrics = ctx.measureText(t.name);
-        const padX = 20 / state.camera.zoom;
-        const padY = 10 / state.camera.zoom;
+        const padX = (sub ? 14 : 20) / state.camera.zoom;
+        const padY = (sub ? 7 : 10) / state.camera.zoom;
         const width = metrics.width + padX * 2;
-        const height = (16 / state.camera.zoom) + padY * 2;
-        const radius = 8 / state.camera.zoom;
-        
+        const height = (fontPx / state.camera.zoom) + padY * 2;
+        const radius = (sub ? 12 : 8) / state.camera.zoom;
+
         ctx.roundRect(-width/2, -height/2, width, height, radius);
         ctx.fill();
+        if (sub) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.lineWidth = 1.5 / state.camera.zoom;
+            ctx.stroke();
+        }
         
         ctx.fillStyle = 'white';
         ctx.textAlign = 'center';
