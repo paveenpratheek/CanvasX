@@ -9205,6 +9205,33 @@ function warnThumbnailFailed(handle, e) {
     console.warn('Could not save thumbnail', e);
 }
 
+/* Light or dark: how CanvasX looks to this viewer, kept in this browser
+ * (t-42699da5ed, t-c92bf5dcb0). A canvas keeps its own background; only a
+ * new canvas starts on the theme's (t-de2aedc5bb). */
+function currentTheme() {
+    return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+
+function applyTheme(theme) {
+    if (theme === 'light') document.documentElement.dataset.theme = 'light';
+    else delete document.documentElement.dataset.theme;
+    const label = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`;
+    document.querySelectorAll('.theme-toggle').forEach(btn => {
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+    });
+    newFabricBg.value = theme === 'light' ? '#ffffff' : '#1a1a1a';
+}
+
+function toggleTheme() {
+    const theme = currentTheme() === 'light' ? 'dark' : 'light';
+    try { localStorage.setItem('canvasx-theme', theme); } catch (_) { /* storage blocked: this page only */ }
+    applyTheme(theme);
+}
+
+document.querySelectorAll('.theme-toggle').forEach(btn => btn.addEventListener('click', toggleTheme));
+applyTheme(currentTheme());
+
 btnHome.addEventListener('click', async () => {
     await flushFabricSave(); // write the last edits before the canvas is let go
     currentFabricHandle = null;
@@ -9957,6 +9984,7 @@ function showFabricContextMenu(x, y, fabricName, assigned = false) {
     
     const deleteBtn = document.createElement('button');
     deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'danger';
     deleteBtn.style.cssText = 'background:transparent;border:none;color:#ef4444;padding:10px 16px;text-align:left;cursor:pointer;border-radius:4px;font-family:inherit;font-size:14px;';
     deleteBtn.onmouseenter = () => deleteBtn.style.background = 'rgba(239,68,68,0.1)';
     deleteBtn.onmouseleave = () => deleteBtn.style.background = 'transparent';

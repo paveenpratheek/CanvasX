@@ -1487,7 +1487,7 @@ body.agent-view #agent-banner strong {
     color: #c7d2fe;
     font-size: 13px;
 }
-body.agent-view #toolbar .tool-btn:not(#btn-pan):not(#btn-home),
+body.agent-view #toolbar .tool-btn:not(#btn-pan):not(#btn-home):not(#btn-theme),
 body.agent-view #toolbar .color-dropdown,
 body.agent-view #toolbar .tool-group:has(.color-dropdown),
 body.agent-view #toolbar .tool-group:has(#btn-home) + .separator,
@@ -3088,3 +3088,117 @@ textarea:focus-visible,
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ===== Light theme =====
+   The theme colours CanvasX itself - home screen, toolbars, ribbons, menus,
+   popups and dialogs - never a canvas, which keeps the background saved in
+   its fabric.json (t-de2aedc5bb). Set as data-theme="light" on <html>
+   (t-c92bf5dcb0); dark is the default above. Items on a canvas keep their
+   colours, so body text stays light here, as it is on every canvas. */
+.home-actions { display: flex; gap: 12px; align-items: center; }
+.home-btn.theme-toggle { padding: 10px 12px; }
+.theme-toggle .icon-moon { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --text-color: #1f2937;
+    --text-secondary: #6b7280;
+    --text-muted: #6b7280;
+    --text-primary: #111827;
+    --panel-bg: rgba(255, 255, 255, 0.8);
+    --panel-bg-solid: rgba(250, 250, 251, 0.97);
+    --panel-border: rgba(15, 23, 42, 0.12);
+    --bg-hover: rgba(15, 23, 42, 0.07);
+    --shadow-pop: 0 16px 48px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+:root[data-theme="light"] body { color: #f3f4f6; }
+
+/* Home screen */
+:root[data-theme="light"] .home-screen { background: #f4f4f6; color: #1f2937; }
+:root[data-theme="light"] .home-header h1 { color: #111827; }
+:root[data-theme="light"] .workspace-header { border-bottom-color: rgba(15, 23, 42, 0.1); }
+:root[data-theme="light"] .workspace-header h2 { color: #6b7280; }
+:root[data-theme="light"] .home-btn { background: rgba(15, 23, 42, 0.06); color: #1f2937; }
+:root[data-theme="light"] .home-btn:hover { background: rgba(15, 23, 42, 0.1); }
+:root[data-theme="light"] .home-btn.primary,
+:root[data-theme="light"] .home-btn.accent { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(79, 70, 229, 0.25); }
+:root[data-theme="light"] .home-btn.primary:hover,
+:root[data-theme="light"] .home-btn.accent:hover { background: var(--accent-hover); }
+:root[data-theme="light"] .fabric-card { background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
+:root[data-theme="light"] .fabric-card:hover { background: #fff; border-color: rgba(79, 70, 229, 0.35); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12); }
+:root[data-theme="light"] .fabric-card-icon { background: #e7e7ec; color: rgba(15, 23, 42, 0.25); }
+:root[data-theme="light"] .fabric-card-info h3 { color: #111827; }
+:root[data-theme="light"] .fabric-card-info p { color: #6b7280; }
+:root[data-theme="light"] .fabric-card.agent-card .fabric-card-info p { color: #4f46e5; }
+/* The fabric menu is styled inline by showFabricContextMenu, hence !important. */
+:root[data-theme="light"] #fabric-context-menu,
+:root[data-theme="light"] #dynamic-fabric-menu { background: #fff !important; border-color: rgba(15, 23, 42, 0.12) !important; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15) !important; }
+:root[data-theme="light"] #fabric-context-menu button:not(.danger),
+:root[data-theme="light"] #dynamic-fabric-menu button:not(.danger) { color: #1f2937 !important; }
+:root[data-theme="light"] #fabric-context-menu button:hover,
+:root[data-theme="light"] #dynamic-fabric-menu button:hover { background: rgba(15, 23, 42, 0.06) !important; }
+:root[data-theme="light"] #fabric-context-menu button.danger:hover,
+:root[data-theme="light"] #dynamic-fabric-menu button.danger:hover { background: rgba(239, 68, 68, 0.1) !important; }
+
+/* Dialogs */
+:root[data-theme="light"] .modal-overlay { background: rgba(15, 23, 42, 0.35); }
+:root[data-theme="light"] .modal-content { background: #fff; border-color: rgba(15, 23, 42, 0.1); box-shadow: 0 24px 64px rgba(15, 23, 42, 0.2); }
+:root[data-theme="light"] .modal-content h3 { color: #111827; border-bottom-color: rgba(15, 23, 42, 0.08); }
+:root[data-theme="light"] .modal-body label { color: #374151; }
+:root[data-theme="light"] .modal-body input[type="text"],
+:root[data-theme="light"] .modal-body select { background: #f9fafb; border-color: rgba(15, 23, 42, 0.15); color: #111827; }
+:root[data-theme="light"] .modal-separator { color: #9ca3af; }
+:root[data-theme="light"] .modal-separator::before,
+:root[data-theme="light"] .modal-separator::after { border-bottom-color: rgba(15, 23, 42, 0.1); }
+:root[data-theme="light"] .file-input-btn { color: #6b7280; }
+:root[data-theme="light"] .modal-footer { background: #f9fafb; border-top-color: rgba(15, 23, 42, 0.08); }
+
+/* Toolbar and ribbons */
+:root[data-theme="light"] #toolbar { box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12); }
+:root[data-theme="light"] .color-indicator { border-color: rgba(15, 23, 42, 0.2); }
+:root[data-theme="light"] .color-dropdown:hover .color-indicator { border-color: rgba(15, 23, 42, 0.55); }
+:root[data-theme="light"] #btn-settings-icon { background: rgba(15, 23, 42, 0.07) !important; color: #374151; }
+:root[data-theme="light"] .properties-panel { background: rgba(255, 255, 255, 0.9); box-shadow: 0 10px 40px rgba(15, 23, 42, 0.14); }
+:root[data-theme="light"] .properties-panel select { background: #fff; border-color: rgba(15, 23, 42, 0.15); color: #111827; }
+:root[data-theme="light"] #prop-font-size { background: #fff !important; color: #111827 !important; border-color: rgba(15, 23, 42, 0.15) !important; }
+:root[data-theme="light"] #prop-font-size-val { color: #374151; }
+:root[data-theme="light"] .slider-row input[type="range"] { background: rgba(15, 23, 42, 0.12); }
+:root[data-theme="light"] .slider-row input[type="range"]::-webkit-slider-thumb { background: var(--accent); }
+:root[data-theme="light"] .text-style-group { background: rgba(15, 23, 42, 0.05); }
+:root[data-theme="light"] .prop-toggle-btn { color: #6b7280; }
+:root[data-theme="light"] .prop-toggle-btn:hover { background: rgba(15, 23, 42, 0.07); color: #111827; }
+:root[data-theme="light"] .prop-toggle-btn.active { background: rgba(15, 23, 42, 0.1); color: #111827; box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.08); }
+:root[data-theme="light"] .project-action-btn { background: rgba(15, 23, 42, 0.04); border-color: rgba(15, 23, 42, 0.12); color: #1f2937; }
+:root[data-theme="light"] .project-action-btn:hover { background: rgba(15, 23, 42, 0.08); border-color: rgba(15, 23, 42, 0.2); }
+:root[data-theme="light"] .project-save-btn { background: rgba(79, 70, 229, 0.12); border-color: rgba(79, 70, 229, 0.35); }
+:root[data-theme="light"] .project-save-btn:hover { background: rgba(79, 70, 229, 0.2); }
+:root[data-theme="light"] .project-delete-btn { color: #dc2626; }
+:root[data-theme="light"] .project-name-input { background: #fff; border-color: rgba(15, 23, 42, 0.15); color: #111827; }
+:root[data-theme="light"] .project-name-input::placeholder { color: rgba(15, 23, 42, 0.35); }
+
+/* Menus and popups */
+:root[data-theme="light"] .file-menu,
+:root[data-theme="light"] .area-ctx-menu,
+:root[data-theme="light"] .color-palette-popup,
+:root[data-theme="light"] #widget-add-menu,
+:root[data-theme="light"] .area-resize-overlay { background: rgba(255, 255, 255, 0.97); border-color: rgba(15, 23, 42, 0.12); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.15); }
+:root[data-theme="light"] .menu-item,
+:root[data-theme="light"] .area-ctx-item { color: #1f2937; }
+:root[data-theme="light"] .menu-item:hover,
+:root[data-theme="light"] .area-ctx-item:hover { background: rgba(15, 23, 42, 0.06); }
+:root[data-theme="light"] .menu-item.danger,
+:root[data-theme="light"] .area-ctx-danger { color: #dc2626; }
+:root[data-theme="light"] .area-ctx-danger:hover { background: rgba(239, 68, 68, 0.1); }
+:root[data-theme="light"] .area-ctx-header { color: #6b7280; border-bottom-color: rgba(15, 23, 42, 0.08); }
+:root[data-theme="light"] .area-ctx-sep { background: rgba(15, 23, 42, 0.08); }
+:root[data-theme="light"] .area-resize-overlay span { color: #374151; }
+:root[data-theme="light"] .color-swatch { border-color: rgba(15, 23, 42, 0.15); }
+:root[data-theme="light"] .color-swatch:hover { border-color: #111827; }
+/* The settings popup is styled inline in index.html, hence !important. */
+:root[data-theme="light"] #settings-popup { background: rgba(255, 255, 255, 0.97) !important; border-color: rgba(15, 23, 42, 0.12) !important; box-shadow: 0 8px 32px rgba(15, 23, 42, 0.15) !important; }
+:root[data-theme="light"] #settings-popup h4,
+:root[data-theme="light"] #settings-popup label { color: #374151 !important; }
+:root[data-theme="light"] #graphics-preset-select { background: #fff !important; color: #111827 !important; border-color: rgba(15, 23, 42, 0.15) !important; }
+:root[data-theme="light"] body.agent-view #agent-banner strong { color: #4338ca; }

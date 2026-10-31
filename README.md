@@ -49,6 +49,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 - **Files**: drag in any file from the OS, with image and PDF previews
 - **YouTube links** as visual cards
 - **Lasso selection**, context menus, colour palettes and keyboard shortcuts for every tool
+- **Light and dark mode**: a sun/moon button on the home screen and the toolbar. It changes CanvasX itself (home screen, toolbars, menus, dialogs) and is remembered in your browser. Each canvas keeps its own background; a new canvas starts on the theme's.
 
 **Organisation**
 - **Totems**: named groups that gather nearby areas, with Constellation mode (`Shift+R`) to see them all at once
