@@ -2210,7 +2210,7 @@ body.agent-view #selection-overlay {
     background: rgba(15, 15, 17, 0.95);
     backdrop-filter: blur(10px);
     z-index: 999999;
-    padding: 60px;
+    padding: 48px 60px 60px;
     overflow-y: auto;
     transition: opacity 0.2s ease;
 }
@@ -2221,58 +2221,84 @@ body.agent-view #selection-overlay {
     pointer-events: none;
 }
 
+/* Like ter-manager's slide overview: a title, a count line, then framed previews with their
+   name and count beneath. */
+.mc-head { text-align: center; margin-bottom: 40px; pointer-events: none; }
+#mc-title { margin: 0; font-size: 22px; font-weight: 600; color: #f3f4f6; }
+#mc-sub { margin: 6px 0 0; font: 12.5px ui-monospace, 'Cascadia Mono', Consolas, monospace; color: #9ca3af; }
+.mc-empty { grid-column: 1 / -1; text-align: center; padding: 40px; color: #9ca3af; }
+
 .mc-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 30px;
-    max-width: 1400px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 34px 32px;
+    max-width: 1180px;
     margin: 0 auto;
 }
 
 .mc-card {
-    background: #1e1e24;
-    border-radius: 12px;
-    overflow: hidden;
     cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: all 0.2s ease;
+    user-select: none;
 }
 
-.mc-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.15);
+.mc-frame {
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s var(--ease-out), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.mc-card:hover .mc-frame {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
 }
 
 .mc-card-img {
+    display: block;
     width: 100%;
-    height: 200px;
+    aspect-ratio: 16 / 10;
     object-fit: cover;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
 }
 
 .mc-card-footer {
-    padding: 15px;
     display: flex;
-    align-items: center;
-    gap: 12px;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 4px 0;
+    min-width: 0;
+    pointer-events: none;
 }
 
 .mc-card-color {
-    width: 16px;
-    height: 16px;
+    width: 9px;
+    height: 9px;
+    flex: none;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    align-self: center;
 }
 
 .mc-card-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-color);
+    font-size: 14.5px;
+    font-weight: 500;
+    color: #f3f4f6;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.mc-card-count {
+    flex: none;
+    font: 12px ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    color: #9ca3af;
+}
+
+/* A sub-totem's card: smaller label, under its totem's. */
+.mc-sub .mc-card-title { font-size: 13.5px; }
 
 /* ===== Side Panel (shared base for Edge Sidebar + Widget Sidebar) ===== */
 /* Card-stack recede effect: transform/opacity/filter:brightness only (GPU-cheap,
@@ -3203,6 +3229,15 @@ textarea:focus-visible,
 :root[data-theme="light"] #settings-popup label { color: #374151 !important; }
 :root[data-theme="light"] #graphics-preset-select { background: #fff !important; color: #111827 !important; border-color: rgba(15, 23, 42, 0.15) !important; }
 :root[data-theme="light"] body.agent-view #agent-banner strong { color: #4338ca; }
+
+/* Mission Control (Shift+D) */
+:root[data-theme="light"] #mission-control-overlay { background: rgba(242, 242, 243, 0.96); }
+:root[data-theme="light"] #mc-title { color: #1f2937; }
+:root[data-theme="light"] #mc-sub, :root[data-theme="light"] .mc-card-count, :root[data-theme="light"] .mc-empty { color: #6b7280; }
+:root[data-theme="light"] .mc-frame { background: rgba(15, 23, 42, 0.035); border-color: rgba(15, 23, 42, 0.13); }
+:root[data-theme="light"] .mc-card:hover .mc-frame { border-color: rgba(15, 23, 42, 0.24); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14); }
+:root[data-theme="light"] .mc-card-img { border-color: rgba(15, 23, 42, 0.1); }
+:root[data-theme="light"] .mc-card-title { color: #1f2937; }
 
 /* ===== Chat with the agent, on an agent canvas (t-4dc3f16e6e) ===== */
 #agent-chat { display: none; }

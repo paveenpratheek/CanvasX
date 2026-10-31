@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Spatial File Manager</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=1031">
+    <link rel="stylesheet" href="style.css?v=1033">
     <!-- Light or dark is this viewer's choice, kept in the browser and set before the page draws (t-c92bf5dcb0) -->
     <script>try { if (localStorage.getItem('canvasx-theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch (_) {}</script>
 
@@ -624,12 +624,16 @@
 
     <!-- Mission Control Overlay -->
     <div id="mission-control-overlay" class="hidden">
+        <div class="mc-head">
+            <h2 id="mc-title"></h2>
+            <p id="mc-sub"></p>
+        </div>
         <div class="mc-grid" id="mc-grid"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="script.js?v=1063"></script>
+    <script src="script.js?v=1064"></script>
     <script>
         // Setup global error handling to notify user if script fails to load/parse
         window.addEventListener('error', function(e) {

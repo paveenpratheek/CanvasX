@@ -5896,25 +5896,44 @@ function openMissionControl() {
     if (!overlay || !grid) return;
     
     grid.innerHTML = '';
-    
-    if (!state.totems || state.totems.length === 0) {
-        grid.innerHTML = '<div style="color: #9ca3af; grid-column: 1/-1; text-align: center; padding: 40px; font-size: 1.2rem;">No totems found. Create some totems first!</div>';
+
+    // Laid out like ter-manager's slide overview: the canvas's name and what it holds, then each
+    // totem framed with its name and count beneath; a sub-totem follows its totem (t-76b77d74ff, t-62c6ed9e8b).
+    const totems = state.totems || [];
+    const boxesOf = (t) => (state.areas || []).filter(a => a.linkedTotemId === t.id).length;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const tops = totems.filter(t => !isSubTotem(t));
+    const subs = totems.filter(isSubTotem);
+    document.getElementById('mc-title').textContent = currentFabricName || 'Totems';
+    document.getElementById('mc-sub').textContent = [plural(tops.length, 'totem'), ...(subs.length ? [plural(subs.length, 'sub-totem')] : []), plural((state.areas || []).length, 'box').replace('boxs', 'boxes')].join(' · ');
+    const ordered = tops.flatMap(t => [t, ...subTotemsOf(t)]);
+
+    if (totems.length === 0) {
+        grid.innerHTML = '<div class="mc-empty">No totems on this canvas yet. Place one with the Totem tool (M).</div>';
     } else {
-        state.totems.forEach(totem => {
+        ordered.forEach(totem => {
             if (!totem.thumbnail) {
                 totem.thumbnail = generateTotemThumbnail(totem.x, totem.y);
             }
-            
+
             const card = document.createElement('div');
-            card.className = 'mc-card';
-            
+            card.className = 'mc-card' + (isSubTotem(totem) ? ' mc-sub' : '');
+            const parent = isSubTotem(totem) ? totems.find(t => t.id === totem.parentTotemId) : null;
+            const boxes = boxesOf(totem) + (parent ? 0 : subTotemsOf(totem).reduce((n, s) => n + boxesOf(s), 0));
+            const count = [parent ? `in ${parent.name}` : null, plural(boxes, 'box').replace('boxs', 'boxes')].filter(Boolean).join(' · ');
+
             card.innerHTML = `
-                <img class="mc-card-img" src="${totem.thumbnail}" alt="${totem.name}" draggable="false" style="pointer-events: none; user-select: none;">
-                <div class="mc-card-footer" style="pointer-events: none; user-select: none;">
-                    <div class="mc-card-color" style="background-color: ${totem.color || '#3b5a76'}"></div>
-                    <div class="mc-card-title">${totem.name}</div>
+                <div class="mc-frame"><img class="mc-card-img" alt="" draggable="false"></div>
+                <div class="mc-card-footer">
+                    <span class="mc-card-color"></span>
+                    <span class="mc-card-title"></span>
+                    <span class="mc-card-count"></span>
                 </div>
             `;
+            card.querySelector('.mc-card-img').src = totem.thumbnail;
+            card.querySelector('.mc-card-color').style.backgroundColor = totem.color || '#3b5a76';
+            card.querySelector('.mc-card-title').textContent = totem.name;
+            card.querySelector('.mc-card-count').textContent = count;
             
             card.setAttribute('draggable', 'false');
             card.ondragstart = (e) => { e.preventDefault(); return false; };
