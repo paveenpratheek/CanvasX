@@ -9482,7 +9482,8 @@ async function notexCall(method, path, body) {
         if (!chatLink) throw new Error('NoteX is not running - start its engine in ter-manager to talk to the agent.');
         let res;
         try {
-            res = await fetch(chatLink.url + path, { method, cache: 'no-store', headers: { 'x-notex-link': chatLink.token, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+            const form = body instanceof FormData;
+            res = await fetch(chatLink.url + path, { method, cache: 'no-store', headers: { 'x-notex-link': chatLink.token, ...(body && !form ? { 'content-type': 'application/json' } : {}) }, body: form ? body : body ? JSON.stringify(body) : undefined });
         } catch {
             chatLink = null;
             if (attempt) throw new Error('NoteX is not answering - start its engine in ter-manager to talk to the agent.');
@@ -9529,6 +9530,12 @@ function renderAgentChat(r) {
         who.className = 'who';
         who.textContent = (t.who === 'user' ? 'You' : `Agent · ${MODEL_NAMES[t.model] || t.model}${t.totems && t.totems.length ? ` · changed ${t.totems.join(', ')}` : ''}`) + ` · ${chatAgo(t.at)}`;
         li.append(who, document.createTextNode(t.text || ''));
+        if (t.attachments && t.attachments.length) {
+            const att = document.createElement('span');
+            att.className = 'attached';
+            att.textContent = `Attached: ${t.attachments.map(a => a.name).join(', ')}`;
+            li.append(att);
+        }
         log.append(li);
     }
     chatWorking = Boolean(r.ask && r.ask.status === 'working');
@@ -9559,18 +9566,103 @@ async function refreshAgentChat() {
 async function sendAgentChat() {
     const box = document.getElementById('agent-chat-text');
     const ask = box.value.trim();
-    if (!ask || chatWorking || !agentCanvas) return;
+    if ((!ask && !chatFiles.length) || chatWorking || !agentCanvas) return;
     const name = currentFabricName;
     const model = document.getElementById('agent-chat-model').value || undefined;
     document.getElementById('agent-chat-send').disabled = true;
     try {
-        await notexCall('POST', `/api/link/canvases/${encodeURIComponent(name)}/ask`, { ask, model });
+        if (chatFiles.length) {
+            // Files go with the message in one send: NoteX keeps them as drops of this canvas and
+            // the agent places them as the message says (NoteX t-79ac13d22a).
+            const fd = new FormData();
+            for (const f of chatFiles) fd.append('file', f, f.name);
+            fd.append('message', ask);
+            if (model) fd.append('model', model);
+            await notexCall('POST', `/api/link/canvases/${encodeURIComponent(name)}/send`, fd);
+            chatFiles = [];
+            renderChatFiles();
+        } else {
+            await notexCall('POST', `/api/link/canvases/${encodeURIComponent(name)}/ask`, { ask, model });
+        }
         box.value = '';
     } catch (e) {
         setChatState(e.message, true);
     }
     await refreshAgentChat();
 }
+
+// --- Attachments: picked, dropped or pasted into the chat (t-4be567d997) ---
+let chatFiles = [];
+const CHAT_KINDS = ['txt', 'md', 'markdown', 'pdf', 'docx', 'png', 'jpg', 'jpeg', 'webp', 'gif'];
+const chatKind = (f) => (f.name.split('.').pop() || '').toLowerCase();
+
+function attachChatFiles(list) {
+    const files = [...list];
+    const refused = files.filter(f => !CHAT_KINDS.includes(chatKind(f)));
+    if (refused.length) setChatState(`${refused.map(f => f.name).join(', ')}: not text, Markdown, a PDF, a Word file or a PNG, JPEG, WebP or GIF image.`, true);
+    chatFiles.push(...files.filter(f => CHAT_KINDS.includes(chatKind(f))));
+    renderChatFiles();
+}
+
+function renderChatFiles() {
+    const ul = document.getElementById('agent-chat-files');
+    for (const img of ul.querySelectorAll('img')) URL.revokeObjectURL(img.src);
+    ul.replaceChildren();
+    ul.hidden = !chatFiles.length;
+    chatFiles.forEach((f, i) => {
+        const li = document.createElement('li');
+        li.title = f.name;
+        if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(chatKind(f))) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(f);
+            img.alt = '';
+            li.append(img);
+        } else {
+            const k = document.createElement('span');
+            k.className = 'kind';
+            k.textContent = chatKind(f).toUpperCase().slice(0, 4);
+            li.append(k);
+        }
+        const nm = document.createElement('span');
+        nm.className = 'name';
+        nm.textContent = f.name;
+        const off = document.createElement('button');
+        off.textContent = '×';
+        off.title = `Take ${f.name} off`;
+        off.addEventListener('click', () => { chatFiles.splice(i, 1); renderChatFiles(); });
+        li.append(nm, off);
+        ul.append(li);
+    });
+}
+
+document.getElementById('agent-chat-attach').addEventListener('click', () => document.getElementById('agent-chat-pick').click());
+document.getElementById('agent-chat-pick').addEventListener('change', (e) => { attachChatFiles(e.target.files); e.target.value = ''; });
+document.getElementById('agent-chat-text').addEventListener('paste', (e) => {
+    const files = e.clipboardData && e.clipboardData.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    attachChatFiles(files);
+});
+// On an agent canvas a file dragged in may land only on the chat: CanvasX's own drop - the
+// overlay and the copy onto the canvas - never sees it, and elsewhere it is not taken at all.
+window.addEventListener('dragover', (e) => {
+    if (!agentCanvas) return;
+    const inChat = Boolean(e.target.closest && e.target.closest('#agent-chat'));
+    document.getElementById('agent-chat').classList.toggle('drag-over', inChat);
+    if (inChat) e.preventDefault();
+    e.stopImmediatePropagation();
+}, true);
+window.addEventListener('dragleave', (e) => {
+    if (agentCanvas && !e.relatedTarget) document.getElementById('agent-chat').classList.remove('drag-over');
+}, true);
+document.getElementById('agent-chat').addEventListener('drop', (e) => {
+    if (!agentCanvas) return;
+    e.preventDefault();
+    e.stopPropagation();
+    document.getElementById('agent-chat').classList.remove('drag-over');
+    if (e.dataTransfer && e.dataTransfer.files.length) attachChatFiles(e.dataTransfer.files);
+});
 
 function startAgentChat() {
     stopAgentChat();
@@ -9585,6 +9677,8 @@ function startAgentChat() {
 function stopAgentChat() {
     if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
     chatWorking = false;
+    chatFiles = [];
+    renderChatFiles();
 }
 
 document.getElementById('agent-chat-send').addEventListener('click', sendAgentChat);

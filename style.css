@@ -3278,3 +3278,17 @@ body.agent-view #agent-chat.folded { bottom: auto; }
 #agent-chat-model option { color: #111; }
 #agent-chat-send { padding: 6px 14px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 #agent-chat-send:disabled { opacity: 0.5; cursor: default; }
+
+/* Files attached in the agent chat */
+#agent-chat.drag-over { outline: 2px dashed var(--accent); outline-offset: -6px; }
+#agent-chat-files { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+#agent-chat-files[hidden] { display: none; }
+#agent-chat-files li { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 3px; border-radius: 8px; background: var(--bg-hover); border: 1px solid var(--panel-border); font-size: 12px; }
+#agent-chat-files img, #agent-chat-files .kind { width: 30px; height: 30px; flex: none; border-radius: 6px; object-fit: cover; }
+#agent-chat-files .kind { display: grid; place-items: center; background: var(--panel-border); color: var(--text-secondary); font-size: 9.5px; font-weight: 700; }
+#agent-chat-files .name { min-width: 0; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#agent-chat-files button { width: 20px; height: 20px; flex: none; border: none; border-radius: 50%; background: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; line-height: 1; }
+#agent-chat-files button:hover { background: var(--bg-hover); color: var(--text-color); }
+#agent-chat-attach { margin-right: auto; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--panel-border); background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
+#agent-chat-attach:hover { color: var(--text-color); border-color: var(--accent); }
+#agent-chat-log .attached { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
