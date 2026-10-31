@@ -6176,7 +6176,7 @@ let keyShift = false;
 let keyMoveLast = 0;
 
 function canvasTakesKeys(e) {
-    if (e.ctrlKey || e.altKey || e.metaKey || !homeScreen.classList.contains('hidden')) return false;
+    if (e.ctrlKey || e.metaKey || !homeScreen.classList.contains('hidden')) return false;
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
     const mc = document.getElementById('mission-control-overlay');
@@ -6206,10 +6206,38 @@ function keyMoveFrame(now) {
     requestAnimationFrame(keyMoveFrame);
 }
 
+// Shift+Alt+arrow: fly to the nearest totem or sub-totem that way from the middle of the screen,
+// keeping the zoom (t-c5c13983c0). Only markers within about 63 degrees of the arrow count, scored
+// by the distance along it plus twice the distance off it, so the jump goes the way the arrow
+// points (t-302eba410d). A press during a flight goes on from where that flight is heading.
+function jumpToTotem(key) {
+    const dx = -KEY_MOVES[key][0], dy = -KEY_MOVES[key][1]; // the camera moves against the view
+    const cam = cameraAnim ? { x: cameraAnim.targetX, y: cameraAnim.targetY, zoom: cameraAnim.targetZoom } : state.camera;
+    const cx = -cam.x / cam.zoom, cy = -cam.y / cam.zoom; // the world point in the middle of the screen
+    let best = null, bestScore = Infinity;
+    for (const t of state.totems) {
+        const vx = t.x - cx, vy = t.y - cy;
+        const ahead = vx * dx + vy * dy;
+        const off = Math.abs(vx * dy - vy * dx);
+        if (ahead <= 20 / cam.zoom || off > ahead * 2) continue;
+        const score = ahead + off * 2;
+        if (score < bestScore) { best = t; bestScore = score; }
+    }
+    if (!best) return;
+    heldMoves.clear();
+    startCameraAnimation(-best.x * cam.zoom, -best.y * cam.zoom, cam.zoom);
+}
+
 window.addEventListener('keydown', (e) => {
     keyShift = e.shiftKey;
     if (e.key === 'Escape' && e.target.id === 'agent-chat-text') { e.target.blur(); return; }
     if (!canvasTakesKeys(e)) return;
+    if (KEY_MOVES[e.key] && e.altKey) {
+        if (!e.shiftKey) return; // Alt+arrow alone stays the browser's (back and forward)
+        e.preventDefault();
+        if (!e.repeat) jumpToTotem(e.key);
+        return;
+    }
     if (KEY_MOVES[e.key]) {
         e.preventDefault();
         if (heldMoves.has(e.key)) return;
@@ -6218,7 +6246,7 @@ window.addEventListener('keydown', (e) => {
         if (heldMoves.size === 1) requestAnimationFrame(keyMoveFrame);
         return;
     }
-    if (e.shiftKey && e.key.toLowerCase() === 'a') {
+    if (e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
         const chat = document.getElementById('agent-chat');
         if (!agentCanvas || !chat.getClientRects().length) return; // no chat here (and none in CanvasXP)
         e.preventDefault();
@@ -9508,7 +9536,8 @@ async function showAgentView() {
 // Shift+S widget sidebar, H pan (t-a3dd88c887); and the arrows (pan, Shift+Up/Down zoom) and
 // Shift+A (to the chat), from the keyboard block by animateCamera (t-732565e0d9).
 function isViewShortcut(e) {
-    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    if (e.ctrlKey || e.metaKey) return false;
+    if (e.altKey) return e.shiftKey && Boolean(KEY_MOVES[e.key]); // jump to a totem (t-c5c13983c0)
     const k = String(e.key || '').toLowerCase();
     if (KEY_MOVES[e.key]) return true;
     return e.shiftKey ? ['r', 'd', 's', 'a'].includes(k) : k === 'h';
