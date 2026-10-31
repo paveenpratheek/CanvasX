@@ -1,0 +1,28 @@
+/* CanvasXP only (t-66914c8b0f): the USB sync panel on the home screen, no
+ * agent chat - the agent is talked to on the PC - and a home screen that
+ * fits a phone. */
+#agent-chat { display: none !important; }
+
+.xp-sync {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 0 0 20px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(148, 163, 184, 0.10);
+    font-size: 14px;
+    line-height: 1.45;
+}
+.xp-sync.hidden { display: none; }
+.xp-sync-text { flex: 1 1 260px; min-width: 0; }
+.xp-sync-text strong { margin-right: 6px; }
+
+@media (max-width: 640px) {
+    .home-header { flex-wrap: wrap; gap: 12px; }
+    .home-actions { flex-wrap: wrap; }
+    .workspace-header { flex-wrap: wrap; gap: 12px; }
+    #workspace-path-label { font-size: 18px; overflow-wrap: anywhere; }
+}

@@ -7,3 +7,6 @@ __pycache__/
 # GitX: share the commit graph, keep thoughts and setup files private
 .gitx/*
 !.gitx/commits/
+
+# CanvasXP build output (node xp/make.js)
+xp/site/

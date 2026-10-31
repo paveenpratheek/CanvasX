@@ -68,6 +68,12 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 - A lock file (`.fabric_lock`, refreshed every 10 s) so other tools know when a canvas is open
 - **Agent canvases**: assign an empty canvas to the agent from its menu on the home screen. NoteX then draws it from the agent's scripts. CanvasX shows it view-only, with only Pan and Home and the view shortcuts (Shift+R constellation, Shift+D Mission Control, Shift+S widget sidebar, H pan), and redraws it whenever NoteX changes it. Take it back from the agent to edit it yourself. Beside an agent canvas sits a **chat with the agent**: ask about the canvas or tell it how to arrange it, and pick the model. Attach, drop or paste files and images into the chat and say where they go; the agent places them in the same answer. NoteX runs the agent, redraws the canvas when it changes it, and keeps the conversation. CanvasX finds NoteX through `.notex/link.json`, which NoteX writes into the workspace while it runs.
 
+**CanvasXP, on your phone**
+- **CanvasXP** is CanvasX for phones: the same app, built from the same files, that you host on Netlify and install from Chrome or Samsung Internet. It works on a target folder in the phone's own storage, like CanvasX on the PC.
+- **USB sync with the PC through NoteX.** Press **Set up USB sync** on CanvasXP's home screen, plug the phone in with **File transfer**, and pick the same folder in NoteX's **Phone** view. After that, **Phone attached - sync** in NoteX keeps the two the same, canvas by canvas. When both sides changed a canvas, both versions are kept: the PC's under its name, the phone's beside it as "Name (phone)".
+- CanvasXP keeps what the sync needs in `_canvasxp/` inside its folder. It lists every file with its SHA-256 after each save, and when its home screen shows it takes in what NoteX copied over, once every file's hash checks. If you changed a canvas on the phone after NoteX last saw it, your version is kept aside as "Name (phone)" before the PC's is written.
+- There is no agent chat on the phone: the agent works on the PC. Agent canvases come to the phone view-only.
+
 ---
 
 ## How a canvas is stored
@@ -80,6 +86,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
     sources/         copies of every file dropped on the canvas
     .fabric_lock     present while the canvas is open; refreshed every 10 s
     agent.json       present when the canvas is assigned to the agent
+  _canvasxp/         on a phone, CanvasXP's USB sync: device.json, manifest.json, incoming/
 ```
 
 Because it is plain JSON in plain folders, other programs can read it. **NoteX** reads it to build AI-searchable documents, and writes agents' scripts into it only when the lock has gone stale.
@@ -103,6 +110,14 @@ python -m http.server 9075
 
 Then go to `http://localhost:9075`, pick (or create) a workspace folder, and create a fabric.
 
+### CanvasXP on Netlify
+
+```bash
+node xp/make.js
+```
+
+This builds CanvasXP into `xp/site`: CanvasX's own page, script, styles and icons, with CanvasXP's name, manifest, service worker, `xp.css` and `xp.js` added. Drag `xp/site` onto Netlify, or link this repository: `netlify.toml` runs the build and publishes only `xp/site`, so nothing else in the repository goes online. Open the site on the phone in Chrome or Samsung Internet, install it, and pick a target folder.
+
 ## Project layout
 
 ```
@@ -112,6 +127,8 @@ style.css         styles and animations
 sw.js             service worker
 manifest.json     PWA manifest
 knowledge/        the project's own append-only records: code map, progress, decisions
+xp/               CanvasXP: xp.js (USB sync, phone side), xp.css, manifest, service worker, make.js
+netlify.toml      publishes CanvasXP (xp/site) on Netlify
 ```
 
 ## Works with ter-manager

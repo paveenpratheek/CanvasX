@@ -1,0 +1,5 @@
+# CanvasXP, the portable edition, published to Netlify (t-66914c8b0f).
+# Only xp/site goes out: CanvasX's app files copied beside CanvasXP's own.
+[build]
+  command = "node xp/make.js"
+  publish = "xp/site"
