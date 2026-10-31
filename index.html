@@ -228,6 +228,23 @@
     </div>
 
     <!-- Shown on a canvas assigned to the agent: NoteX draws it, CanvasX only shows it -->
+    <!-- On an agent canvas: a chat with the agent, through NoteX, which keeps the log (t-4dc3f16e6e) -->
+    <aside id="agent-chat" aria-label="Chat with the agent">
+        <div class="agent-chat-head">
+            <strong>Agent</strong>
+            <span id="agent-chat-state"></span>
+            <button id="agent-chat-fold" title="Fold the chat" aria-label="Fold the chat">–</button>
+        </div>
+        <ul id="agent-chat-log"></ul>
+        <div class="agent-chat-compose">
+            <textarea id="agent-chat-text" rows="3" placeholder="Talk to the agent about this canvas - Enter sends, Shift+Enter for a new line"></textarea>
+            <div class="agent-chat-row">
+                <select id="agent-chat-model" aria-label="Claude model" title="The Claude model the agent answers with"></select>
+                <button id="agent-chat-send">Send</button>
+            </div>
+        </div>
+    </aside>
+
     <div id="agent-banner" role="status">
         <strong>Agent canvas · view only</strong>
         <span>NoteX draws it from the agent's scripts. To edit it, take it back from the agent on the home screen.</span>

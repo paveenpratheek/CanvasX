@@ -65,7 +65,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 - Installable **PWA** with a network-first service worker
 - A home screen of fabrics with thumbnails
 - A lock file (`.fabric_lock`, refreshed every 10 s) so other tools know when a canvas is open
-- **Agent canvases**: assign an empty canvas to the agent from its menu on the home screen. NoteX then draws it from the agent's scripts. CanvasX shows it view-only, with only Pan and Home, and redraws it whenever NoteX changes it. Take it back from the agent to edit it yourself.
+- **Agent canvases**: assign an empty canvas to the agent from its menu on the home screen. NoteX then draws it from the agent's scripts. CanvasX shows it view-only, with only Pan and Home, and redraws it whenever NoteX changes it. Take it back from the agent to edit it yourself. Beside an agent canvas sits a **chat with the agent**: ask about the canvas or tell it how to arrange it, and pick the model. NoteX runs the agent, redraws the canvas when it changes it, and keeps the conversation. CanvasX finds NoteX through `.notex/link.json`, which NoteX writes into the workspace while it runs.
 
 ---
 

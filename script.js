@@ -9305,6 +9305,7 @@ async function isEmptyFabric(dirHandle) {
 async function showAgentView() {
     document.body.classList.toggle('agent-view', agentCanvas);
     if (agentWatch) { clearInterval(agentWatch); agentWatch = null; }
+    if (agentCanvas) startAgentChat(); else stopAgentChat();
     if (!agentCanvas) return;
     setMode('pan');
     const handle = currentFabricHandle;
@@ -9329,16 +9330,159 @@ async function showAgentView() {
 // File cards and notes take no pointer at all (style.css), so a drag over them pans.
 window.addEventListener('keydown', (e) => {
     if (!agentCanvas || e.key === ' ' || e.key === 'Escape') return;
+    // The chat takes its own keys here, so CanvasX's shortcuts never see them (t-4dc3f16e6e).
+    if (e.target.closest && e.target.closest('#agent-chat') && e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAgentChat();
+    }
     e.stopImmediatePropagation();
 }, true);
 for (const type of ['drop', 'paste', 'dblclick', 'contextmenu', 'pointerdown']) {
     window.addEventListener(type, (e) => {
         if (!agentCanvas || (type === 'pointerdown' && e.button === 0)) return;
-        if (e.target.closest && e.target.closest('#toolbar, #agent-banner, #totem-indicators')) return;
+        if (e.target.closest && e.target.closest('#toolbar, #agent-banner, #totem-indicators, #agent-chat')) return;
         e.preventDefault();
         e.stopImmediatePropagation();
     }, true);
 }
+
+// --- Chat with the agent ---
+// On an agent canvas the user talks to the agent beside the canvas; NoteX runs the agent, may change
+// the canvas from it, and keeps the conversation (t-4dc3f16e6e). CanvasX finds NoteX through
+// .notex/link.json, which NoteX writes into the workspace: its address and a token that opens only
+// an agent canvas's chat (NoteX t-76dff4fffe). A changed canvas is redrawn by the watch above.
+const MODEL_NAMES = { sonnet: 'Sonnet', opus: 'Opus', haiku: 'Haiku' };
+let chatTimer = null;
+let chatLink = null;
+let chatWorking = false;
+
+async function readNotexLink() {
+    try {
+        const dir = await targetWorkspaceHandle.getDirectoryHandle('.notex');
+        return JSON.parse(await (await (await dir.getFileHandle('link.json')).getFile()).text());
+    } catch { return null; }
+}
+
+// One call to NoteX; the link is read again once if NoteX restarted with a new token.
+async function notexCall(method, path, body) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        if (!chatLink) chatLink = await readNotexLink();
+        if (!chatLink) throw new Error('NoteX is not running - start its engine in ter-manager to talk to the agent.');
+        let res;
+        try {
+            res = await fetch(chatLink.url + path, { method, cache: 'no-store', headers: { 'x-notex-link': chatLink.token, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+        } catch {
+            chatLink = null;
+            if (attempt) throw new Error('NoteX is not answering - start its engine in ter-manager to talk to the agent.');
+            continue;
+        }
+        if (res.status === 401) { chatLink = null; if (attempt) throw new Error('NoteX refused the link - restart its engine.'); continue; }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data.error && data.error.message) || `NoteX answered ${res.status}.`);
+        return data;
+    }
+}
+
+function chatAgo(iso) {
+    const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+    return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : new Date(iso).toLocaleDateString();
+}
+
+function setChatState(text, bad = false) {
+    const el = document.getElementById('agent-chat-state');
+    el.textContent = text || '';
+    el.classList.toggle('bad', bad);
+}
+
+function renderAgentChat(r) {
+    const sel = document.getElementById('agent-chat-model');
+    if (!sel.options.length && r.models) {
+        for (const m of r.models) sel.append(new Option(MODEL_NAMES[m] || m, m));
+        sel.value = r.model || r.models[0];
+    }
+    const log = document.getElementById('agent-chat-log');
+    const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    const count = (r.chat || []).length + (r.ask && r.ask.status === 'working' ? 1 : 0);
+    log.replaceChildren();
+    if (!r.chat || !r.chat.length) {
+        const li = document.createElement('li');
+        li.className = 'agent-chat-empty';
+        li.textContent = 'Ask the agent about this canvas, or tell it how to arrange it. It sees the canvas, what was dropped on it and the images.';
+        log.append(li);
+    }
+    for (const t of r.chat || []) {
+        const li = document.createElement('li');
+        li.className = t.who === 'user' ? 'from-user' : `from-agent${t.status === 'failed' ? ' bad' : ''}`;
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = (t.who === 'user' ? 'You' : `Agent · ${MODEL_NAMES[t.model] || t.model}${t.totems && t.totems.length ? ` · changed ${t.totems.join(', ')}` : ''}`) + ` · ${chatAgo(t.at)}`;
+        li.append(who, document.createTextNode(t.text || ''));
+        log.append(li);
+    }
+    chatWorking = Boolean(r.ask && r.ask.status === 'working');
+    if (chatWorking) {
+        const li = document.createElement('li');
+        li.className = 'from-agent thinking';
+        li.textContent = 'Thinking…';
+        log.append(li);
+    }
+    document.getElementById('agent-chat-send').disabled = chatWorking;
+    setChatState(chatWorking ? `working on ${r.ask.canvas === r.name ? 'it' : r.ask.canvas}` : '');
+    if (atEnd || log.dataset.count !== String(count)) log.scrollTop = log.scrollHeight;
+    log.dataset.count = String(count);
+}
+
+async function refreshAgentChat() {
+    const name = currentFabricName;
+    if (!agentCanvas || !name || !targetWorkspaceHandle) return;
+    try {
+        const r = await notexCall('GET', `/api/link/canvases/${encodeURIComponent(name)}`);
+        if (name === currentFabricName && agentCanvas) renderAgentChat(r);
+    } catch (e) {
+        setChatState(e.message, true);
+        document.getElementById('agent-chat-send').disabled = true;
+    }
+}
+
+async function sendAgentChat() {
+    const box = document.getElementById('agent-chat-text');
+    const ask = box.value.trim();
+    if (!ask || chatWorking || !agentCanvas) return;
+    const name = currentFabricName;
+    const model = document.getElementById('agent-chat-model').value || undefined;
+    document.getElementById('agent-chat-send').disabled = true;
+    try {
+        await notexCall('POST', `/api/link/canvases/${encodeURIComponent(name)}/ask`, { ask, model });
+        box.value = '';
+    } catch (e) {
+        setChatState(e.message, true);
+    }
+    await refreshAgentChat();
+}
+
+function startAgentChat() {
+    stopAgentChat();
+    chatLink = null;
+    document.getElementById('agent-chat-log').replaceChildren();
+    document.getElementById('agent-chat-log').dataset.count = '';
+    setChatState('');
+    refreshAgentChat();
+    chatTimer = setInterval(refreshAgentChat, 3000);
+}
+
+function stopAgentChat() {
+    if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+    chatWorking = false;
+}
+
+document.getElementById('agent-chat-send').addEventListener('click', sendAgentChat);
+document.getElementById('agent-chat-fold').addEventListener('click', () => {
+    const folded = document.getElementById('agent-chat').classList.toggle('folded');
+    const btn = document.getElementById('agent-chat-fold');
+    btn.textContent = folded ? '+' : '–';
+    btn.title = folded ? 'Open the chat' : 'Fold the chat';
+    btn.setAttribute('aria-label', btn.title);
+});
 
 async function setAgentCanvas(name, assign) {
     const dir = await targetWorkspaceHandle.getDirectoryHandle(name);
