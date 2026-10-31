@@ -9411,8 +9411,18 @@ async function showAgentView() {
 // What would change an agent canvas is stopped before CanvasX's own handlers see it: every key but
 // Space and Escape, drops, pastes, double-clicks, right-clicks and buttons other than the left.
 // File cards and notes take no pointer at all (style.css), so a drag over them pans.
+// Shortcuts that only change the view go through: Shift+R constellation, Shift+D Mission Control,
+// Shift+S widget sidebar, H pan (t-a3dd88c887).
+function isViewShortcut(e) {
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+    const k = String(e.key || '').toLowerCase();
+    return e.shiftKey ? ['r', 'd', 's'].includes(k) : k === 'h';
+}
+
 window.addEventListener('keydown', (e) => {
     if (!agentCanvas || e.key === ' ' || e.key === 'Escape') return;
+    const inChat = e.target.closest && e.target.closest('#agent-chat');
+    if (!inChat && isViewShortcut(e)) return;
     // The chat takes its own keys here, so CanvasX's shortcuts never see them (t-4dc3f16e6e).
     if (e.target.closest && e.target.closest('#agent-chat') && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
