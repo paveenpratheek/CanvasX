@@ -5349,8 +5349,8 @@ function showTotemContextMenu(screenX, screenY, totem) {
     menu.querySelector('[data-action="move-totem"]').addEventListener('click', () => {
         dismissTotemContextMenu();
         
-        // Field radius is 500 (hardcoded in magnetic fields logic)
-        const radius = 500;
+        // The totem's own field (t-08dd5b6ef9)
+        const radius = TOTEM_FIELD;
         // A totem moves with its sub-totems and what they hold (t-9b101d1e08).
         const subIds = new Set(subTotemsOf(totem).map(t => t.id));
         
@@ -6750,6 +6750,12 @@ function isItemOnScreen(item) {
     return isBBoxOnScreen(bb);
 }
 
+// How far a totem's field reaches, and the field round each item that has joined one: an item
+// within TOTEM_FIELD of a totem's marker joins it, and one within ITEM_FIELD of a member joins
+// that member's totem - both 1.5 times the old 500 and 300 (t-08dd5b6ef9).
+const TOTEM_FIELD = 750;
+const ITEM_FIELD = 450;
+
 function computeMagneticClusters() {
     activeMagneticFields = [];
     const totems = state.totems || [];
@@ -6794,16 +6800,16 @@ function computeMagneticClusters() {
             type: 'totem',
             x: totem.x,
             y: totem.y,
-            radius: 500,
+            radius: TOTEM_FIELD,
             parsedColor: c,
-            bbox: { minX: totem.x - 500, minY: totem.y - 500, maxX: totem.x + 500, maxY: totem.y + 500 }
+            bbox: { minX: totem.x - TOTEM_FIELD, minY: totem.y - TOTEM_FIELD, maxX: totem.x + TOTEM_FIELD, maxY: totem.y + TOTEM_FIELD }
         });
         
         for (let d of itemDatas) {
             if (d.visited) continue;
             
             const dist = distToBBox(totem.x, totem.y, d.bbox);
-            if (dist <= 500) {
+            if (dist <= TOTEM_FIELD) {
                 d.visited = true;
                 d.linkedTotem = totem;
                 d.item.linkedTotemId = totem.id;
@@ -6813,7 +6819,7 @@ function computeMagneticClusters() {
                     activeMagneticFields.push({
                         type: 'item',
                         bbox: d.bbox,
-                        radius: 300,
+                        radius: ITEM_FIELD,
                         parsedColor: c
                     });
                 }
@@ -6828,7 +6834,7 @@ function computeMagneticClusters() {
             if (d.visited) continue;
             
             const dist = bboxDistance(current.bbox, d.bbox);
-            if (dist <= 300) {
+            if (dist <= ITEM_FIELD) {
                 d.visited = true;
                 d.linkedTotem = current.linkedTotem;
                 d.item.linkedTotemId = current.linkedTotem.id;
@@ -6839,7 +6845,7 @@ function computeMagneticClusters() {
                     activeMagneticFields.push({
                         type: 'item',
                         bbox: d.bbox,
-                        radius: 300,
+                        radius: ITEM_FIELD,
                         parsedColor: c
                     });
                 }
