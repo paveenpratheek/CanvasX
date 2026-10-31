@@ -123,6 +123,20 @@ function shownFabricColor() {
     const saved = state.fabricColor || DEFAULT_FABRIC_COLOR;
     return document.documentElement.dataset.theme === 'light' && saved.toLowerCase() === DEFAULT_FABRIC_COLOR ? '#ffffff' : saved;
 }
+
+/* The colour a text is shown in. In light mode, white or near-white text on
+ * a light background is shown black; the canvas keeps the colour it saved
+ * (t-e1bfa56fe3). */
+function shownTextColor(color) {
+    if (document.documentElement.dataset.theme !== 'light' || !color || !isColorLight(shownFabricColor())) return color;
+    const c = String(color).trim().toLowerCase();
+    if (c === 'white') return '#111111';
+    let hex = c.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+    if (!/^[0-9a-f]{6}$/.test(hex)) return color;
+    const nearWhite = [0, 2, 4].every(i => parseInt(hex.substring(i, i + 2), 16) >= 230);
+    return nearWhite ? '#111111' : color;
+}
 let currentSourcesHandle = null;
 let currentFabricName = null;
 
@@ -465,7 +479,7 @@ function updateInlineEditorStyle() {
         const fw = state.selectedText.isBold ? 'bold ' : '600 ';
         const fs = state.selectedText.isItalic ? 'italic ' : '';
         input.style.font = `${fs}${fw}${state.selectedText.fontSize * state.camera.zoom}px ${state.selectedText.fontFamily}`;
-        input.style.color = state.selectedText.color;
+        input.style.color = shownTextColor(state.selectedText.color);
         if (state.selectedText.textAlign) input.style.textAlign = state.selectedText.textAlign;
         input.style.height = 'auto';
         input.style.height = input.scrollHeight + 'px';
@@ -856,7 +870,7 @@ function openTextEditor(e, existingDrawing = null, definedWidth = null) {
     const fontWeight = existingDrawing && existingDrawing.isBold ? 'bold ' : '600 ';
     const fontFamily = existingDrawing && existingDrawing.fontFamily ? existingDrawing.fontFamily : 'Inter, sans-serif';
     input.style.font = `${fontStyle}${fontWeight}${baseFontSize * state.camera.zoom}px ${fontFamily}`;
-    input.style.color = existingDrawing ? (existingDrawing.color || state.areaColor) : state.areaColor;
+    input.style.color = shownTextColor(existingDrawing ? (existingDrawing.color || state.areaColor) : state.areaColor);
     if (existingDrawing && existingDrawing.textAlign) {
         input.style.textAlign = existingDrawing.textAlign;
     }
@@ -6264,7 +6278,7 @@ function syncTextsDOM() {
 
         el.style.font = `${fontStyle}${fontWeight}${baseFontSize}px ${fontFamily}`;
         el.style.lineHeight = '1.2';
-        el.style.color = d.color || state.areaColor;
+        el.style.color = shownTextColor(d.color || state.areaColor);
         el.style.textAlign = d.textAlign || 'left';
         
         if (d.width) {
@@ -7450,7 +7464,7 @@ function drawDrawings(filter) {
                 drawing._resizeBox = null;
             }
             
-            let currentTextColor = drawing.color || (effectiveIsBgLight ? '#111111' : '#ffffff');
+            let currentTextColor = shownTextColor(drawing.color) || (effectiveIsBgLight ? '#111111' : '#ffffff');
             ctx.fillStyle = currentTextColor;
             
             let drawX = drawing.x;
@@ -7636,7 +7650,7 @@ function drawDrawings(filter) {
             const timeStr = `${hrs} : ${mins} : ${secs} | ${date} ${month}`;
             
             const fontSize = Math.max(10, Math.min(drawing.height * 0.6, drawing.width * 0.15));
-            ctx.fillStyle = drawing.textColor || state.areaColor;
+            ctx.fillStyle = shownTextColor(drawing.textColor || state.areaColor);
             ctx.font = `bold ${fontSize}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
