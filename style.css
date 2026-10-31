@@ -3091,10 +3091,11 @@ textarea:focus-visible,
 
 /* ===== Light theme =====
    The theme colours CanvasX itself - home screen, toolbars, ribbons, menus,
-   popups and dialogs - never a canvas, which keeps the background saved in
-   its fabric.json (t-de2aedc5bb). Set as data-theme="light" on <html>
-   (t-c92bf5dcb0); dark is the default above. Items on a canvas keep their
-   colours, so body text stays light here, as it is on every canvas. */
+   popups and dialogs (t-de2aedc5bb). A canvas left on the default black is
+   shown white by shownFabricColor() in script.js; its fabric.json keeps
+   black (t-20cf6f1740). Set as data-theme="light" on <html> (t-c92bf5dcb0);
+   dark is the default above. Items on a canvas keep their colours, so body
+   text stays light here, as it is on every canvas. */
 .home-actions { display: flex; gap: 12px; align-items: center; }
 .home-btn.theme-toggle { padding: 10px 12px; }
 .theme-toggle .icon-moon { display: none; }

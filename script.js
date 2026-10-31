@@ -113,6 +113,16 @@ const btnHome = document.getElementById('btn-home');
 // File System Access API state
 let targetWorkspaceHandle = null;
 let currentFabricHandle = null;
+
+/* The background a canvas is shown on. In light mode a canvas left on the
+ * default black is shown white - fill, grid, thumbnail and all that adapts
+ * to a light background - while its fabric.json keeps black; any other
+ * colour shows as saved (t-20cf6f1740). */
+const DEFAULT_FABRIC_COLOR = '#1a1a1a';
+function shownFabricColor() {
+    const saved = state.fabricColor || DEFAULT_FABRIC_COLOR;
+    return document.documentElement.dataset.theme === 'light' && saved.toLowerCase() === DEFAULT_FABRIC_COLOR ? '#ffffff' : saved;
+}
 let currentSourcesHandle = null;
 let currentFabricName = null;
 
@@ -336,7 +346,7 @@ PRESET_COLORS.forEach(hex => {
         if (activeColorTarget === 'fabric') {
             if (hex === 'transparent') return;
             state.fabricColor = hex;
-            indicatorFabric.style.background = hex;
+            indicatorFabric.style.background = shownFabricColor();
             document.documentElement.style.setProperty('--fabric-bg', hex);
             scheduleRender();
             saveCurrentFabric();
@@ -6111,7 +6121,7 @@ function render() {
     // Recompute what's visible this frame so every draw/sync loop can cull off-screen items.
     updateViewBounds(width, height);
 
-    ctx.fillStyle = state.fabricColor;
+    ctx.fillStyle = shownFabricColor();
     ctx.fillRect(0, 0, width, height);
     
     // Apply Camera Transform
@@ -6308,8 +6318,8 @@ function syncTables() {
             container.style.display = '';
             container.style.left = table.x + 'px';
             container.style.top = table.y + 'px';
-            container.style.background = state.fabricColor === '#ffffff' ? '#ffffff' : '#222';
-            container.style.color = state.fabricColor === '#ffffff' ? '#000' : '#fff';
+            container.style.background = shownFabricColor() === '#ffffff' ? '#ffffff' : '#222';
+            container.style.color = shownFabricColor() === '#ffffff' ? '#000' : '#fff';
             const offsetF = getAnimationOffset(table);
             container.style.transform = (offsetF.dx !== 0 || offsetF.dy !== 0)
                 ? `translate(${offsetF.dx}px, ${offsetF.dy}px)` : '';
@@ -6329,9 +6339,9 @@ function syncTables() {
         container.style.left = table.x + 'px';
         container.style.top = table.y + 'px';
         container.style.pointerEvents = 'auto';
-        container.style.background = state.fabricColor === '#ffffff' ? '#ffffff' : '#222';
+        container.style.background = shownFabricColor() === '#ffffff' ? '#ffffff' : '#222';
         container.style.border = '2px solid #555';
-        container.style.color = state.fabricColor === '#ffffff' ? '#000' : '#fff';
+        container.style.color = shownFabricColor() === '#ffffff' ? '#000' : '#fff';
         container.style.boxShadow = '0 4px 6px rgba(0,0,0,0.3)';
         container.style.borderRadius = '4px';
         container.style.overflow = 'hidden';
@@ -6780,7 +6790,7 @@ function drawGrid(width, height) {
     
     const dotSize = Math.max(1.5 / state.camera.zoom, 0.5);
     
-    const isLight = isColorLight(state.fabricColor);
+    const isLight = isColorLight(shownFabricColor());
     const baseColor = isLight ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.15)';
     
     computeMagneticClusters();
@@ -7371,7 +7381,7 @@ function drawDrawings(filter) {
                 ctx.fillRect(drawing.x - padding, drawing.y - padding, maxWidth + padding * 2, totalHeight + padding * 2);
             }
             
-            let effectiveIsBgLight = isColorLight(state.fabricColor);
+            let effectiveIsBgLight = isColorLight(shownFabricColor());
             if (drawing.areaId) {
                 const area = state.areas.find(a => a.id === drawing.areaId);
                 if (area && area.color !== 'transparent') {
@@ -7972,7 +7982,7 @@ function drawBookUI(area, bbox, isBgLight, adjustedColor) {
 }
 
 function drawAreas() {
-    const isBgLight = isColorLight(state.fabricColor);
+    const isBgLight = isColorLight(shownFabricColor());
     
     // Ensure bgCanvas is correctly sized
     if (bgCanvas.width !== canvas.width || bgCanvas.height !== canvas.height) {
@@ -8218,7 +8228,7 @@ function drawAreas() {
         }
 
         if (state.graphicsPreset === 'efficient') {
-            ctx.fillStyle = blendHexColors(state.fabricColor, adjustedColor, blendRatio);
+            ctx.fillStyle = blendHexColors(shownFabricColor(), adjustedColor, blendRatio);
         } else {
             ctx.fillStyle = hexToRgba(adjustedColor, blendRatio);
         }
@@ -8983,7 +8993,8 @@ function prepareFabricState(loadedState = null, bgColor = '#1a1a1a') {
         textStartPos: {x: 0, y: 0}
     };
     
-    document.body.style.backgroundColor = state.fabricColor;
+    document.body.style.backgroundColor = shownFabricColor();
+    indicatorFabric.style.background = shownFabricColor();
     
     // Create DOM elements for files
     for (const fileData of state.files) {
@@ -9173,7 +9184,7 @@ function drawFabricThumbnail(handle) {
         thumbCanvas.width = thumbSize;
         thumbCanvas.height = thumbSize * aspect;
         const tCtx = thumbCanvas.getContext('2d');
-        tCtx.fillStyle = state.fabricColor || '#1a1a1a';
+        tCtx.fillStyle = shownFabricColor();
         tCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
         tCtx.drawImage(bgCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
         tCtx.drawImage(canvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
@@ -9206,13 +9217,14 @@ function warnThumbnailFailed(handle, e) {
 }
 
 /* Light or dark: how CanvasX looks to this viewer, kept in this browser
- * (t-42699da5ed, t-c92bf5dcb0). A canvas keeps its own background; only a
- * new canvas starts on the theme's (t-de2aedc5bb). */
+ * (t-42699da5ed, t-c92bf5dcb0). A canvas keeps the background it saved,
+ * except that the default black is shown white in light mode (t-20cf6f1740);
+ * a new canvas starts on the theme's (t-de2aedc5bb). */
 function currentTheme() {
     return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
-function applyTheme(theme) {
+function applyTheme(theme, { redraw = false } = {}) {
     if (theme === 'light') document.documentElement.dataset.theme = 'light';
     else delete document.documentElement.dataset.theme;
     const label = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`;
@@ -9221,12 +9233,18 @@ function applyTheme(theme) {
         btn.setAttribute('aria-label', label);
     });
     newFabricBg.value = theme === 'light' ? '#ffffff' : '#1a1a1a';
+    // An open canvas left on the default black turns white or back (t-20cf6f1740).
+    if (redraw && currentFabricHandle) {
+        document.body.style.backgroundColor = shownFabricColor();
+        indicatorFabric.style.background = shownFabricColor();
+        scheduleRender();
+    }
 }
 
 function toggleTheme() {
     const theme = currentTheme() === 'light' ? 'dark' : 'light';
     try { localStorage.setItem('canvasx-theme', theme); } catch (_) { /* storage blocked: this page only */ }
-    applyTheme(theme);
+    applyTheme(theme, { redraw: true });
 }
 
 document.querySelectorAll('.theme-toggle').forEach(btn => btn.addEventListener('click', toggleTheme));
@@ -9755,7 +9773,7 @@ function syncNotesDOM() {
             display.style.width = '100%';
             display.style.height = '100%';
             display.style.padding = '60px 24px 20px 24px';
-            display.style.color = state.fabricColor === '#ffffff' ? '#111111' : '#ffffff';
+            display.style.color = shownFabricColor() === '#ffffff' ? '#111111' : '#ffffff';
             display.style.fontFamily = "'Consolas', 'Courier New', monospace";
             display.style.whiteSpace = "pre-wrap";
             display.style.wordWrap = "break-word";
@@ -9778,7 +9796,7 @@ function syncNotesDOM() {
             editor.style.outline = 'none';
             editor.style.resize = 'none';
             editor.style.padding = '60px 24px 20px 24px';
-            editor.style.color = state.fabricColor === '#ffffff' ? '#111111' : '#ffffff';
+            editor.style.color = shownFabricColor() === '#ffffff' ? '#111111' : '#ffffff';
             editor.style.fontFamily = "'Consolas', 'Courier New', monospace";
             editor.style.fontSize = "14px";
             editor.style.lineHeight = "1.4";
@@ -9918,7 +9936,7 @@ function syncNotesDOM() {
         
         applyDOMClip(container, note);
         
-        const isBgLight = isColorLight(state.fabricColor || '#1a1a1a');
+        const isBgLight = isColorLight(shownFabricColor());
         const textColor = isBgLight ? '#111111' : '#ffffff';
         const displayEl = container.querySelector('.note-display');
         const editorEl = container.querySelector('.note-editor');
