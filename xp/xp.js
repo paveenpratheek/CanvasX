@@ -39,9 +39,30 @@
     let chain = Promise.resolve();
     const serial = (fn) => { const p = chain.then(fn, fn); chain = p.catch(() => {}); return p; };
 
+    /* _canvasxp/ is the real folder's own (store.js leaves it out of the working copy), and each
+     * step to it costs about a second on a phone (t-6beedb06b4): its handle is kept once found,
+     * and device.json and the agent chats - which only Set up and a take-in change - are read
+     * once and kept until then. */
+    let xpHandle = null, xpFor = null;
+    const memo = new Map();
+    let savingNow = null; // the working copy's queue to the folder, as store.js last told it
     async function xpDir(create = false) {
         if (!targetWorkspaceHandle) return null;
-        try { return await targetWorkspaceHandle.getDirectoryHandle(XP, { create }); } catch { return null; }
+        if (xpHandle && xpFor === targetWorkspaceHandle) return xpHandle;
+        try {
+            xpHandle = await targetWorkspaceHandle.getDirectoryHandle(XP, { create });
+            xpFor = targetWorkspaceHandle;
+            return xpHandle;
+        } catch { return null; }
+    }
+    async function remembered(key, read) {
+        if (!memo.has(key)) memo.set(key, await read());
+        return memo.get(key);
+    }
+    async function deviceOf() {
+        const dir = await xpDir();
+        if (!dir) return null; // not set up: asked again next time, not remembered
+        return remembered('device', () => readJson(dir, 'device.json'));
     }
     async function readJson(dir, name) {
         try { return JSON.parse(await (await (await dir.getFileHandle(name)).getFile()).text()); } catch { return null; }
@@ -116,7 +137,10 @@
      * unchanged keeps the hash it had, so photos are not read again. */
     async function refreshManifest() {
         const dir = await xpDir();
-        if (!dir || !(await readJson(dir, 'device.json'))) return;
+        if (!dir || !(await deviceOf())) return;
+        // Read from the working copy, so it must say what the folder holds: once every write is there (t-35a415fa01).
+        // While the folder refuses one, nothing is claimed; tried again later.
+        if (!(await XPStore.idle(targetWorkspaceHandle))) { scheduleManifest(30000); return; }
         const prev = (await readJson(dir, 'manifest.json')) || {};
         const canvases = {};
         for await (const e of targetWorkspaceHandle.values()) {
@@ -226,7 +250,7 @@
             }
             try { await removeFolder(inc, id); } catch (e) { console.warn('Could not remove batch', id, e); } // t-7b1443b8ce
         }
-        if (taken) await refreshManifest();
+        if (taken) { memo.clear(); await refreshManifest(); } // a batch may bring new chats
         return { taken, aside, waiting };
     }
 
@@ -331,7 +355,7 @@
     const panel = document.createElement('div');
     panel.id = 'xp-sync';
     panel.className = 'xp-sync hidden';
-    panel.innerHTML = `<span class="xp-sync-icon">${svg(ICONS.usb, 18)}</span><div class="xp-sync-text"><strong id="xp-sync-title">USB sync</strong> <span id="xp-sync-state"></span></div><div class="xp-sync-progress" hidden><span></span></div><button id="xp-setup" class="home-btn">Set up USB sync</button>`;
+    panel.innerHTML = `<span class="xp-sync-icon">${svg(ICONS.usb, 18)}</span><div class="xp-sync-text"><strong id="xp-sync-title">USB sync</strong> <span id="xp-sync-state"></span> <span id="xp-save-state"></span></div><div class="xp-sync-progress" hidden><span></span></div><button id="xp-setup" class="home-btn">Set up USB sync</button>`;
     const header = document.querySelector('#workspace-content .workspace-header');
     header.parentNode.insertBefore(panel, header.nextSibling);
     const stateEl = panel.querySelector('#xp-sync-state');
@@ -349,7 +373,7 @@
 
     async function showState(note) {
         const dir = await xpDir();
-        const dev = dir && (await readJson(dir, 'device.json'));
+        const dev = dir && (await deviceOf());
         panel.classList.remove('hidden');
         setupBtn.hidden = Boolean(dev);
         showProgress(null);
@@ -393,6 +417,7 @@
             try { dir = await folder.getDirectoryHandle(XP, { create: true }); } catch (e) { fail(`Making the ${XP} folder in "${folder.name}"`, e); return; }
             const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
             try { await writeJson(dir, 'device.json', { id, name, app: 'CanvasXP', createdAt: new Date().toISOString() }); } catch (e) { fail('Writing device.json', e); return; }
+            memo.clear();
             const back = await readJson(dir, 'device.json');
             if (!back || back.id !== id) { fail('Reading device.json back', 'it was written but does not read back the same.'); return; }
             try { await serial(refreshManifest); } catch (e) { fail('Writing manifest.json', e); return; }
@@ -446,7 +471,8 @@
 
     async function chatOf(name) {
         const dir = await xpDir();
-        try { return await readJson(await dir.getDirectoryHandle('chats'), `${name}.json`); } catch { return null; }
+        if (!dir) return null;
+        return remembered(`chat:${name}`, async () => { try { return await readJson(await dir.getDirectoryHandle('chats'), `${name}.json`); } catch { return null; } });
     }
 
     async function readText(dir, name) {
@@ -539,7 +565,7 @@
         const name = currentFabricName;
         if (!agentCanvas || !name || !targetWorkspaceHandle) return;
         const dir = await xpDir();
-        const dev = dir && (await readJson(dir, 'device.json'));
+        const dev = dir && (await deviceOf());
         const r = (dev && (await chatOf(name))) || { name, chat: [], model: 'sonnet', models: MODELS };
         const waiting = dev ? await queued(name) : [];
         if (name !== currentFabricName || !agentCanvas) return;
@@ -606,7 +632,7 @@
         if ((!prompt && !description && !chatFiles.length) || !agentCanvas) return;
         if (prompt.length + description.length > MAX_TEXT) { setChatState(`A message can be at most ${MAX_TEXT} characters.`, true); return; }
         const dir = await xpDir();
-        if (!dir || !(await readJson(dir, 'device.json'))) { setChatState('Set up USB sync on the home screen first', true); return; }
+        if (!dir || !(await deviceOf())) { setChatState('Set up USB sync on the home screen first', true); return; }
         const btn = document.getElementById('agent-chat-send');
         btn.disabled = true;
         try {
@@ -678,7 +704,9 @@
     document.body.append(pop, pill);
     const q = (sel) => pop.querySelector(sel);
 
-    let started = false, lastName = null, lastAt = 0, current = null, tucked = false, closeTimer = null, view = null, finishing = false;
+    // polls: status reads that finished since the last news - a phone whose reads are slow is not NoteX gone quiet (t-ae96a0c460).
+    const STALE_POLLS = 15;
+    let started = false, lastName = null, lastAt = 0, polls = 0, current = null, tucked = false, closeTimer = null, view = null, finishing = false;
 
     function render(v) {
         view = v;
@@ -797,11 +825,13 @@
         if (latest && latest !== lastName) {
             lastName = latest;
             lastAt = Date.now();
+            polls = 0;
             const st = await readJson(sd, latest);
             if (st && st.stage) showStep(st);
             return;
         }
-        if (syncing && Date.now() - lastAt > STALE_MS) {
+        polls++;
+        if (syncing && Date.now() - lastAt > STALE_MS && polls >= STALE_POLLS) {
             syncing = null;
             current = null;
             if (agentCanvas) refreshPhoneChat();
@@ -816,7 +846,7 @@
     }
     setInterval(tick, POLL_MS);
     // A phone asleep runs no timers: waking is not NoteX going quiet.
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) lastAt = Date.now(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastAt = Date.now(); polls = 0; } });
 
     /* ------------------------------------------- always Tablet Mode on a phone */
 
@@ -1003,7 +1033,8 @@
         document.body.classList.toggle('xp-on-canvas', onCanvas);
         document.getElementById('xp-tb-name').textContent = currentFabricName || '';
         const device = onTablet() ? 'tablet' : 'phone';
-        document.getElementById('xp-tb-sub').textContent = agentCanvas ? 'Drawn by NoteX from the agent\'s scripts' : `Saved on this ${device}`;
+        const copying = savingNow && savingNow.waiting;
+        document.getElementById('xp-tb-sub').textContent = agentCanvas ? 'Drawn by NoteX from the agent\'s scripts' : copying ? `Saved on this ${device} · copying to the folder` : `Saved on this ${device}`;
         const sub = document.querySelector('.xp-home-sub');
         if (sub) sub.textContent = `Your canvases, on this ${device}`;
         const folder = document.getElementById('xp-folder-name');
@@ -1041,13 +1072,49 @@
 
     /* ------------------------------------------------- wrapping CanvasX */
 
+    /* The folder opened: CanvasXP works from its copy in the browser's storage from here on
+     * (t-35a415fa01). The first time, every file is copied once, with a card saying how far it
+     * has got; after that the copy opens at once and the folder is compared with it in the
+     * background, the home screen drawn again if a canvas changed outside CanvasXP. */
     const origInit = initializeWorkspace;
+    let unwatch = null;
     initializeWorkspace = async function () {
+        const real = targetWorkspaceHandle;
+        memo.clear();
+        xpHandle = null;
+        const copy = await XPStore.open(real, ({ done, total, text }) => {
+            showBusy(`Making a fast copy of "${real.name}" on this ${onTablet() ? 'tablet' : 'phone'}`,
+                total ? `Only this once. ${done} of ${total} files · ${text}` : `Only this once. ${text}…`, total ? done / total : null);
+        });
+        hideBusy();
+        if (targetWorkspaceHandle !== real) return; // another folder was picked meanwhile
+        targetWorkspaceHandle = copy;
+        if (unwatch) unwatch();
+        unwatch = XPStore.onStatus(copy, showSaving);
+        showSaving(XPStore.status(copy));
         await origInit.apply(this, arguments);
         updateChrome();
         await tick(); // what NoteX left before the folder was opened is not news
         await onHome();
+        setTimeout(async () => {
+            if (targetWorkspaceHandle !== copy) return;
+            let changed = [];
+            try { changed = await XPStore.reconcile(copy); } catch (e) { console.warn('CanvasXP: comparing the folder with the copy failed', e); }
+            if (changed.length && targetWorkspaceHandle === copy && !homeScreen.classList.contains('hidden')) await loadFabricsGrid();
+        }, 4000);
     };
+
+    // What is still being copied to the folder: on the USB sync card and under the canvas's name.
+    function showSaving(st) {
+        savingNow = st;
+        const el = document.getElementById('xp-save-state');
+        if (el) {
+            el.textContent = !st ? '' : st.error ? `Could not save to the folder yet (${st.error}) - trying again.`
+                : st.waiting ? `Saving ${st.waiting} change${st.waiting === 1 ? '' : 's'} to the folder - keep CanvasXP open before syncing.` : '';
+            el.classList.toggle('bad', Boolean(st && st.error));
+        }
+        updateChrome();
+    }
     const origWrite = writeFabric;
     writeFabric = async function () {
         const r = await origWrite.apply(this, arguments);
@@ -1075,6 +1142,60 @@
         openBar.classList.remove('busy');
         openBar.firstChild.style.width = `${Math.max(4, Math.round((done / total) * 100))}%`;
     };
+    // The same card for the folder's first copy into the browser's storage (t-35a415fa01).
+    function showBusy(title, text, frac) {
+        openPop.querySelector('.xp-pop-title').textContent = title;
+        openText.textContent = text;
+        openBar.classList.toggle('busy', frac == null);
+        openBar.firstChild.style.width = frac == null ? '' : `${Math.max(4, Math.round(frac * 100))}%`;
+        openPop.hidden = false;
+    }
+    function hideBusy() { if (!opening) openPop.hidden = true; }
+
+    /* The phone's keyboard (t-c5dfe34d15). The page is asked to shrink above it
+     * (interactive-widget, make.js), but where a browser lays the keyboard over
+     * the page instead, --xp-kb holds its height so the chat sheet sits on it.
+     * Either way, what is being typed into stays in sight: in the chat its box
+     * scrolls into view, and on the canvas - a note, a text, a table cell - the
+     * canvas moves up until it clears the keyboard. */
+    const vv = window.visualViewport;
+    const editing = () => {
+        const el = document.activeElement;
+        return el && (el.isContentEditable || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(button|checkbox|radio|range|color|file)$/.test(el.type))) ? el : null;
+    };
+    function keepTypingInSight() {
+        const el = editing();
+        if (!el || !document.body.classList.contains('xp-phone')) return;
+        const shown = vv ? vv.offsetTop + vv.height : window.innerHeight; // the bottom of what is visible, in page terms
+        const r = el.getBoundingClientRect();
+        if (el.closest('#agent-chat, .xp-pop, .modal, #new-fabric-modal')) {
+            el.scrollIntoView({ block: 'nearest' }); // the compose area's scroll-padding keeps it clear of the Send row
+            return;
+        }
+        if (!el.closest('#workspace, .inline-text-input') && !el.classList.contains('inline-text-input')) return;
+        const caretBottom = Math.min(r.bottom, r.top + 160); // a long note: its first lines, where typing starts
+        const dy = caretBottom - (shown - 24);
+        if (dy <= 0) return;
+        state.camera.y -= dy;
+        // The text tool's box is placed on the screen once, not by the canvas: it moves with it.
+        const box = el.closest('.inline-text-input') || (el.classList.contains('inline-text-input') ? el : null);
+        if (box) box.style.top = `${parseFloat(box.style.top || '0') - dy}px`;
+        scheduleRender();
+    }
+    if (vv) {
+        let kbTimer = null;
+        const onViewport = () => {
+            const kb = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+            document.documentElement.style.setProperty('--xp-kb', `${kb > 80 ? kb : 0}px`);
+            clearTimeout(kbTimer);
+            kbTimer = setTimeout(keepTypingInSight, 60); // once the keyboard has settled
+        };
+        vv.addEventListener('resize', onViewport);
+        vv.addEventListener('scroll', onViewport);
+    }
+    window.addEventListener('resize', () => setTimeout(keepTypingInSight, 60));
+    document.addEventListener('focusin', () => setTimeout(keepTypingInSight, 350)); // the keyboard takes a moment to come up
+
     let opening = null;
     const origOpen = openFabric;
     openFabric = function (dirHandle, name) {

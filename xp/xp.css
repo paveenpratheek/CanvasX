@@ -223,12 +223,31 @@ body.xp-phone #color-palette-popup { top: auto !important; bottom: calc(96px + e
 body.xp-phone #settings-popup { left: auto !important; right: 8px !important; top: 72px !important; max-width: calc(100vw - 16px); }
 
 /* ------------------------------------------------------- the agent chat: a sheet */
+/* The sheet never runs past the screen or under the keyboard (--xp-kb, set in xp.js where the
+ * keyboard lies over the page), and what is being written keeps Send in sight: the attachments
+ * are one row that swipes sideways, and when space runs short the conversation gives way first,
+ * then the writing area scrolls inside itself with Send pinned at its foot (t-73a58fc0e6). */
 body.xp-phone.agent-view #agent-chat {
-    left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none;
-    height: min(66dvh, 580px); border-radius: 18px 18px 0 0; border-bottom: none;
+    left: 0; right: 0; top: auto; bottom: var(--xp-kb, 0px); width: auto; max-width: none;
+    height: min(66dvh, 580px, calc(100dvh - var(--xp-kb, 0px) - 56px)); border-radius: 18px 18px 0 0; border-bottom: none;
     padding-bottom: env(safe-area-inset-bottom); background: var(--xp-card); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35); font-size: 14px;
 }
 body.xp-phone.agent-view #agent-chat.folded { top: auto; bottom: 0; height: auto; }
+body.xp-phone:not(.xp-side).agent-view #agent-chat:not(.folded):has(:focus) { height: calc(100dvh - var(--xp-kb, 0px) - 56px); max-height: 640px; }
+body.xp-phone #agent-chat-log { flex: 1 1 auto; min-height: 48px; }
+body.xp-phone .agent-chat-compose { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 72px; }
+/* Writing: the conversation gives way entirely, so the box being typed in is never under the Send row. */
+body.xp-phone #agent-chat:has(.agent-chat-compose :focus) #agent-chat-log { flex: 1 1 0; min-height: 0; padding-top: 0; padding-bottom: 0; }
+body.xp-phone .agent-chat-row { position: sticky; bottom: 0; padding-top: 6px; background: var(--xp-card); z-index: 1; }
+body.xp-phone #agent-chat-files { flex: none; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-bottom: 2px; }
+body.xp-phone #agent-chat-files::-webkit-scrollbar { display: none; }
+body.xp-phone #agent-chat-files li { flex: none; }
+body.xp-phone #agent-chat-files img, body.xp-phone #agent-chat-files .kind { width: 40px; height: 40px; }
+body.xp-phone #agent-chat-files .name { max-width: 96px; }
+body.xp-phone #agent-chat-files button { width: 32px; height: 32px; font-size: 18px; }
+#xp-save-state { display: block; color: var(--text-secondary); }
+#xp-save-state:empty { display: none; }
+#xp-save-state.bad { color: #ef4444; }
 body.xp-phone .xp-sheet-handle { display: flex; justify-content: center; padding-top: 8px; }
 body.xp-phone .xp-sheet-handle span { width: 36px; height: 4px; border-radius: 999px; background: var(--xp-line); }
 body.xp-phone #agent-chat .agent-chat-head { gap: 12px; padding: 4px 8px 10px 16px; cursor: pointer; }
@@ -348,7 +367,7 @@ body.xp-side #color-palette-popup { top: 50% !important; bottom: auto !important
 
 /* ------------------------------------------------------------ the agent chat */
 /* Upright: a taller sheet */
-body.xp-tab.agent-view #agent-chat { height: min(56dvh, 680px); border-radius: 24px 24px 0 0; font-size: 15px; }
+body.xp-tab.agent-view #agent-chat { height: min(56dvh, 680px, calc(100dvh - var(--xp-kb, 0px) - 56px)); border-radius: 24px 24px 0 0; font-size: 15px; }
 body.xp-tab #agent-chat-log { padding: 16px 24px; }
 body.xp-tab #agent-chat-log li { max-width: 72%; font-size: 15px; }
 body.xp-tab .agent-chat-compose { padding: 12px 24px 20px; }
@@ -357,7 +376,7 @@ body.xp-tab #agent-chat-attach { width: 48px; }
 
 /* Sideways: a panel on the right, the canvas beside it; folded, a card at the bottom right */
 body.xp-side.agent-view #agent-chat {
-    left: auto; right: 0; top: 0; bottom: 0; width: 400px; height: auto;
+    left: auto; right: 0; top: 0; bottom: var(--xp-kb, 0px); width: 400px; height: auto;
     border-radius: 0; border: none; border-left: 1px solid var(--panel-border); box-shadow: none;
 }
 body.xp-side.agent-view #agent-chat.folded { top: auto; right: 16px; bottom: 16px; width: 360px; height: auto; border-radius: 18px; border: 1px solid var(--panel-border); box-shadow: var(--xp-shadow); }

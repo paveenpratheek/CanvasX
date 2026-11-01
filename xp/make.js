@@ -20,7 +20,7 @@ const version = Date.now().toString(36);
 fs.mkdirSync(SITE, { recursive: true });
 for (const f of fs.readdirSync(SITE)) fs.rmSync(path.join(SITE, f), { recursive: true, force: true });
 for (const f of ['script.js', 'style.css']) fs.copyFileSync(path.join(APP, f), path.join(SITE, f));
-for (const f of ['xp.js', 'xp.css', 'manifest.json']) fs.copyFileSync(path.join(XP, f), path.join(SITE, f));
+for (const f of ['store.js', 'xp.js', 'xp.css', 'manifest.json']) fs.copyFileSync(path.join(XP, f), path.join(SITE, f));
 // CanvasXP's own icons, not CanvasX's (t-bea4bb5b8d); icons/render.mjs draws the PNGs from the SVGs.
 for (const f of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png', 'favicon.svg']) fs.copyFileSync(path.join(XP, 'icons', f), path.join(SITE, f));
 fs.writeFileSync(path.join(SITE, 'sw.js'), fs.readFileSync(path.join(XP, 'sw.js'), 'utf8').replace('__VERSION__', version));
@@ -36,7 +36,7 @@ swap(/<title>[^<]*<\/title>/, '<title>CanvasXP</title>');
 swap(/(<meta name="viewport" content="[^"]*)(")/, '$1, interactive-widget=resizes-content$2');
 // Every build is a new address for CanvasX's own files too, so a phone never keeps an old copy.
 swap(/<link rel="stylesheet" href="style\.css\?v=[^"]*">/, `<link rel="stylesheet" href="style.css?v=${version}">\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
-swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
+swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="store.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
 swap(/<h1>CanvasX<\/h1>/, '<h1>CanvasXP</h1>');
 swap(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#141418">');
 swap(/<link rel="apple-touch-icon" href="[^"]*">/, '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n    <link rel="apple-touch-icon" href="icon-180.png">');

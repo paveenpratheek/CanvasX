@@ -9755,6 +9755,7 @@ function renderChatFiles() {
         li.title = f.name;
         if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(chatKind(f))) {
             const img = document.createElement('img');
+            img.decoding = 'async'; // a phone photo is large: decoded off the main thread, not while the chat is used
             img.src = URL.createObjectURL(f);
             img.alt = '';
             li.append(img);
