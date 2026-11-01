@@ -773,6 +773,22 @@
     // A phone asleep runs no timers: waking is not NoteX going quiet.
     document.addEventListener('visibilitychange', () => { if (!document.hidden) lastAt = Date.now(); });
 
+    /* ------------------------------------------- always Tablet Mode on a phone */
+
+    // Fingers move the canvas and the pen draws; the PC's mode, where a finger is a mouse,
+    // is not offered - on a phone it only ever got the canvas stuck (t-fc05d39619). A mouse
+    // and a pen work the same in Tablet Mode.
+    setTabletMode(true);
+    const tabletToggle = document.getElementById('tablet-mode-toggle');
+    const tabletRow = tabletToggle && tabletToggle.closest('label');
+    if (tabletRow) {
+        tabletRow.style.display = 'none';
+        const note = document.createElement('p');
+        note.className = 'xp-touch-note';
+        note.textContent = 'Touch: two fingers move the canvas, a two-finger tap opens options, and three-finger swipes open Mission Control, Constellation and Widgets. The pen or a mouse clicks, drags and draws.';
+        tabletRow.after(note);
+    }
+
     /* ------------------------------------------------- wrapping CanvasX */
 
     const origInit = initializeWorkspace;

@@ -59,6 +59,9 @@
 .xp-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg-solid); color: var(--text-color); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .xp-pill[hidden] { display: none; }
 
+/* Settings: what touch does, in place of the Tablet Mode switch */
+.xp-touch-note { margin: 0 0 12px; font-size: 12px; line-height: 1.45; color: #d1d5db; }
+
 /* The Description box above the Prompt, and a queued message's description */
 #xp-chat-desc {
     width: 100%; resize: vertical; min-height: 38px; max-height: 140px; padding: 7px 10px; border-radius: 8px;
