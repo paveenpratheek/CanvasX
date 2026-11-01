@@ -119,6 +119,27 @@
 
     /* ----------------------------------------------------- taking batches in */
 
+    /* Folder handles opened once per take-in: on an Android phone every step
+     * through the browser's folder access costs about a second (t-8706c0507c). */
+    function handles(root) {
+        const m = new Map();
+        return async (segs, create = false) => {
+            let d = root, k = '';
+            for (const s of segs) {
+                k += '/' + s;
+                let h = m.get(k);
+                if (!h) { h = await d.getDirectoryHandle(s, { create }); m.set(k, h); }
+                d = h;
+            }
+            return d;
+        };
+    }
+    async function fileIn(dirOf, segs) {
+        try { return await (await (await dirOf(segs.slice(0, -1))).getFileHandle(segs[segs.length - 1])).getFile(); } catch { return null; }
+    }
+    const hexOf = async (buf) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), (x) => x.toString(16).padStart(2, '0')).join('');
+    const KEEP_BYTES = 64 * 1024 * 1024; // read once to check, kept to write
+
     async function waitingBatches() {
         const dir = await xpDir();
         if (!dir) return [];
@@ -151,6 +172,9 @@
                 const ch = await readJson(b, 'changes.json');
                 if (!ch || !Array.isArray(ch.ops)) { waiting = 'the list of changes (changes.json) still copying'; break; }
                 const puts = ch.ops.filter((o) => o.op === 'put').length;
+                const inBatch = handles(b);
+                const bytes = new Map();
+                let kept = 0;
                 let checked = 0;
                 for (const op of ch.ops) {
                     if (op.op === 'chat') {
@@ -161,13 +185,23 @@
                     }
                     if (op.op !== 'put') continue;
                     if (!safeCanvas(op.canvas) || !safeRel(op.path)) { waiting = `a file CanvasXP cannot name: ${op.canvas}/${op.path}`; break; }
-                    const f = await fileAt(b, ['files', op.canvas, ...op.path.split('/')]);
+                    const f = await fileIn(inBatch, ['files', op.canvas, ...op.path.split('/')]);
                     if (!f) { waiting = `${op.canvas}/${op.path} still copying`; break; }
-                    if ((await sha256(f)) !== op.sha) { waiting = `${op.canvas}/${op.path} not yet what NoteX sent`; break; }
-                    if (++checked % 10 === 0) progress(`Checking the PC's changes: ${checked} of ${puts} files`);
+                    const buf = await f.arrayBuffer();
+                    if ((await hexOf(buf)) !== op.sha) { waiting = `${op.canvas}/${op.path} not yet what NoteX sent`; break; }
+                    if (kept + buf.byteLength <= KEEP_BYTES) { bytes.set(`${op.canvas}/${op.path}`, new Blob([buf])); kept += buf.byteLength; }
+                    if (++checked % 5 === 0) progress(`Checking the PC's changes: ${checked} of ${puts} files`);
                 }
                 if (waiting) break;
-                aside.push(...(await applyOps(b, ch.ops, progress)));
+                const known = new Map();
+                aside.push(...(await applyOps(b, ch.ops, progress, { inBatch, bytes, known })));
+                // What was written or found in place goes into the manifest, so it is not read again.
+                manifest.canvases = manifest.canvases || {};
+                for (const [key, info] of known) {
+                    const i = key.indexOf('/');
+                    const c = (manifest.canvases[key.slice(0, i)] ||= { files: {} });
+                    (c.files ||= {})[key.slice(i + 1)] = info;
+                }
                 manifest.applied = [...manifest.applied, id].slice(-KEEP_APPLIED);
                 manifest.lastSync = { at: ch.at || new Date().toISOString(), from: ch.from || 'the PC' };
                 if (aside.length) manifest.keptAside = [...(manifest.keptAside || []), ...aside].slice(-20);
@@ -183,9 +217,11 @@
     /* One batch's changes. A canvas changed here since NoteX last saw it -
      * a file not what NoteX thought - is copied aside as "Name (phone)"
      * before the PC's version is written, so nothing made here is lost. */
-    async function applyOps(batch, ops, progress = noProgress) {
+    async function applyOps(batch, ops, progress = noProgress, { inBatch = handles(batch), bytes = new Map(), known = new Map() } = {}) {
         const aside = [];
         const checked = new Set();
+        const inTarget = handles(targetWorkspaceHandle);
+        const current = new Map(); // canvas/path -> { sha, file } of what is in place now
         const keepAside = async (canvas) => {
             if (checked.has(canvas)) return;
             checked.add(canvas);
@@ -193,9 +229,13 @@
             let changed = false;
             for (const op of ops) {
                 if ((op.op !== 'put' && op.op !== 'del') || op.canvas !== canvas || !safeRel(op.path)) continue;
-                const f = await fileAt(targetWorkspaceHandle, [canvas, ...op.path.split('/')]);
-                const now = f ? await sha256(f) : null;
-                if (now !== (op.was || null)) { changed = true; break; }
+                const f = await fileIn(inTarget, [canvas, ...op.path.split('/')]);
+                const now = f ? await hexOf(await f.arrayBuffer()) : null;
+                current.set(`${canvas}/${op.path}`, { sha: now, file: f });
+                // Already what the PC sends - a take-in cut off before it finished - is no change made here (t-8706c0507c).
+                if (now === (op.was || null) || (op.op === 'put' ? now === op.sha : now === null)) continue;
+                changed = true;
+                break;
             }
             if (!changed) return;
             const to = await phoneName(canvas);
@@ -245,15 +285,19 @@
             } else if (op.op === 'put') {
                 if (!safeRel(op.path)) return;
                 await keepAside(op.canvas);
+                const key = `${op.canvas}/${op.path}`;
                 const segs = op.path.split('/');
-                const f = await fileAt(batch, ['files', op.canvas, ...segs]);
-                const d = await dirAt(targetWorkspaceHandle, [op.canvas, ...segs.slice(0, -1)], true);
-                await writeBlob(d, segs[segs.length - 1], f);
+                const here = current.get(key);
+                if (here && here.sha === op.sha) { known.set(key, { size: here.file.size, mtime: here.file.lastModified, sha: op.sha }); return; } // already in place
+                const blob = bytes.get(key) || (await fileIn(inBatch, ['files', op.canvas, ...segs]));
+                const d = await inTarget([op.canvas, ...segs.slice(0, -1)], true);
+                await writeBlob(d, segs[segs.length - 1], blob);
+                try { const w = await (await d.getFileHandle(segs[segs.length - 1])).getFile(); known.set(key, { size: w.size, mtime: w.lastModified, sha: op.sha }); } catch { /* read again by the manifest */ }
             } else if (op.op === 'del') {
                 if (!safeRel(op.path)) return;
                 await keepAside(op.canvas);
                 const segs = op.path.split('/');
-                try { await (await dirAt(targetWorkspaceHandle, [op.canvas, ...segs.slice(0, -1)])).removeEntry(segs[segs.length - 1]); } catch { /* already gone */ }
+                try { await (await inTarget([op.canvas, ...segs.slice(0, -1)])).removeEntry(segs[segs.length - 1]); } catch { /* already gone */ }
             } else if (op.op === 'drop') {
                 // Deleted on the PC: gone here too, unless it changed here since.
                 if (!(await exists(op.canvas))) return;

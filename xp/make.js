@@ -16,8 +16,9 @@ const APP = path.dirname(XP);
 const SITE = path.join(XP, 'site');
 const version = Date.now().toString(36);
 
-fs.rmSync(SITE, { recursive: true, force: true });
+// Emptied rather than removed: a local server for the phone may be serving from it.
 fs.mkdirSync(SITE, { recursive: true });
+for (const f of fs.readdirSync(SITE)) fs.rmSync(path.join(SITE, f), { recursive: true, force: true });
 for (const f of ['script.js', 'style.css', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(APP, f), path.join(SITE, f));
 for (const f of ['xp.js', 'xp.css', 'manifest.json']) fs.copyFileSync(path.join(XP, f), path.join(SITE, f));
 fs.writeFileSync(path.join(SITE, 'sw.js'), fs.readFileSync(path.join(XP, 'sw.js'), 'utf8').replace('__VERSION__', version));
