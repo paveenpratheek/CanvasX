@@ -32,6 +32,7 @@ body {
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* the visible height on a phone, address bar and all (t-bf4a4a1092) */
     cursor: grab;
     touch-action: none; /* Prevent default browser panning on touch */
     user-select: none;
@@ -913,6 +914,7 @@ textarea, input, [contenteditable="true"] {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* the visible height on a phone, address bar and all (t-bf4a4a1092) */
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1913,6 +1915,7 @@ body.agent-view #selection-overlay {
     left: 0;
     width: 100vw;
     height: 100vh;
+    height: 100dvh; /* the visible height on a phone, address bar and all (t-bf4a4a1092) */
     z-index: 9999;
     display: flex;
     align-items: center;
@@ -2309,6 +2312,7 @@ body.agent-view #selection-overlay {
     right: 0;
     width: 350px;
     height: 100vh;
+    height: 100dvh; /* the visible height on a phone, address bar and all (t-bf4a4a1092) */
     transform: translateX(105%);
     opacity: 0;
     pointer-events: none;
@@ -3292,3 +3296,34 @@ body.agent-view #agent-chat.folded { bottom: auto; }
 #agent-chat-attach { margin-right: auto; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--panel-border); background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; }
 #agent-chat-attach:hover { color: var(--text-color); border-color: var(--accent); }
 #agent-chat-log .attached { display: block; margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
+
+/* Upload progress: a card at the bottom of the screen, gone while hidden (t-bf4a4a1092) */
+#upload-progress-ribbon {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(420px, calc(100vw - 32px));
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(17, 24, 39, 0.92);
+    color: #e5e7eb;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    font-size: 13px;
+    transform: translate(-50%, 12px);
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+}
+#upload-progress-ribbon.active { opacity: 1; transform: translate(-50%, 0); }
+#upload-progress-ribbon.hidden { display: none; }
+#upload-progress-ribbon .progress-info { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#upload-progress-ribbon .progress-bar-container { flex: 1 1 80px; height: 6px; border-radius: 999px; background: rgba(148, 163, 184, 0.25); overflow: hidden; }
+#progress-bar-fill { width: 0; height: 100%; border-radius: inherit; background: #6366f1; transition: width 0.2s ease; }
+#progress-count { flex: none; font-variant-numeric: tabular-nums; color: #9ca3af; }
+/* The table menu's own display: flex is inline; hidden means gone, not below the screen (t-bf4a4a1092) */
+#table-context-menu.hidden { display: none !important; }

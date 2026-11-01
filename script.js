@@ -1561,6 +1561,8 @@ let touchGestureMaxCount = 0;     // peak simultaneous touch count since the las
 let touchGestureStart = null;     // {x, y} average screen position when the current peak count was first reached
 let touchGestureFired = false;    // true once a swipe/tap has been dispatched for this finger-down sequence
 let touchPanLast = null;          // {x, y} last average position used for continuous 2-finger pan
+let touchSpreadLast = null;       // last distance between the two fingers, for pinch-to-zoom (t-211044b2fe)
+let touchSpreadStart = null;      // that distance when the second finger came down
 
 const TOUCH_SWIPE_THRESHOLD = 70; // screen px the 3-finger average must travel to count as a swipe
 const TOUCH_TAP_MAX_MOVEMENT = 12; // screen px — below this, a 2-finger release counts as a tap
@@ -1573,8 +1575,16 @@ function touchesAverage() {
     return { x: sx / n, y: sy / n };
 }
 
+// Distance between the first two fingers down, for pinch-to-zoom.
+function touchesSpread() {
+    const [a, b] = activeTouches.values();
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+}
+
 function resetTouchGesture() {
     activeTouches.clear();
+    touchSpreadLast = null;
+    touchSpreadStart = null;
     touchGestureMaxCount = 0;
     touchGestureStart = null;
     touchGestureFired = false;
@@ -1591,7 +1601,7 @@ function handleTabletTouchDown(e) {
         touchGestureStart = { x: avg.x, y: avg.y };
         touchGestureFired = false; // a new finger raised the peak count -> re-arm for the new gesture meaning
     }
-    if (activeTouches.size === 2) touchPanLast = touchesAverage();
+    if (activeTouches.size === 2) { touchPanLast = touchesAverage(); touchSpreadLast = touchSpreadStart = touchesSpread(); }
     return true;
 }
 
@@ -1605,14 +1615,27 @@ function handleTabletTouchMove(e) {
 
     if (touchGestureMaxCount === 2 && activeTouches.size === 2) {
         // Continuous 2-finger PAN — apply the average position's frame-to-frame delta directly
-        // to the camera, same effect as dragging with the pan tool.
+        // to the camera, same effect as dragging with the pan tool - and PINCH, zooming about
+        // the point between the fingers as the wheel zooms about the cursor (t-211044b2fe).
         const avg = touchesAverage();
+        const spread = touchesSpread();
         if (touchPanLast) {
             state.camera.x += avg.x - touchPanLast.x;
             state.camera.y += avg.y - touchPanLast.y;
+            if (touchSpreadLast > 0 && spread > 0 && !state.editingDashboardId) {
+                const rect = workspace.getBoundingClientRect();
+                const cx = avg.x - rect.left - rect.width / 2;
+                const cy = avg.y - rect.top - rect.height / 2;
+                const newZoom = Math.min(Math.max(state.camera.zoom * (spread / touchSpreadLast), 0.25), 5);
+                const k = newZoom / state.camera.zoom;
+                state.camera.x = cx - (cx - state.camera.x) * k;
+                state.camera.y = cy - (cy - state.camera.y) * k;
+                state.camera.zoom = newZoom;
+            }
             scheduleRender();
         }
         touchPanLast = avg;
+        touchSpreadLast = spread;
     } else if (touchGestureMaxCount === 3 && activeTouches.size === 3 && touchGestureStart) {
         const avg = touchesAverage();
         const dx = avg.x - touchGestureStart.x;
@@ -1641,7 +1664,8 @@ function handleTabletTouchUp(e) {
     if (!touchGestureFired && touchGestureMaxCount === 2 && rec && touchGestureStart) {
         const heldMs = performance.now() - rec.downTime;
         const moved = touchPanLast ? Math.hypot(touchPanLast.x - touchGestureStart.x, touchPanLast.y - touchGestureStart.y) : 0;
-        if (heldMs <= TOUCH_TAP_MAX_DURATION && moved <= TOUCH_TAP_MAX_MOVEMENT) {
+        const pinched = touchSpreadStart != null && touchSpreadLast != null ? Math.abs(touchSpreadLast - touchSpreadStart) : 0;
+        if (heldMs <= TOUCH_TAP_MAX_DURATION && moved <= TOUCH_TAP_MAX_MOVEMENT && pinched <= TOUCH_TAP_MAX_MOVEMENT) {
             touchGestureFired = true;
             handleWorkspaceContextMenu({
                 clientX: touchGestureStart.x, clientY: touchGestureStart.y,
