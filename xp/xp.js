@@ -208,7 +208,7 @@
                 await writeJson(dir, 'manifest.json', manifest); // taken in, before the batch goes
                 taken++;
             }
-            try { await inc.removeEntry(id, { recursive: true }); } catch (e) { console.warn('Could not remove batch', id, e); }
+            try { await removeFolder(inc, id); } catch (e) { console.warn('Could not remove batch', id, e); } // t-7b1443b8ce
         }
         if (taken) await refreshManifest();
         return { taken, aside, waiting };
@@ -269,7 +269,7 @@
                     try { d = await box.getDirectoryHandle(it.dir); } catch { continue; }
                     const q = parseQueued(await readText(d, MESSAGE));
                     if (!q || q.meta.id !== it.id) continue;
-                    if (op.op === 'answered') { try { await box.removeEntry(it.dir, { recursive: true }); } catch { /* already gone */ } }
+                    if (op.op === 'answered') { try { await removeFolder(box, it.dir); } catch { /* already gone */ } }
                     else await writeBlob(d, NOT_ANSWERED, String(op.error || 'Not answered.'));
                 }
                 return;
@@ -305,7 +305,7 @@
                 await walk(await targetWorkspaceHandle.getDirectoryHandle(op.canvas), '', async (rel, file) => { now[rel] = await sha256(file); });
                 const was = op.files || {};
                 const same = Object.keys(now).length === Object.keys(was).length && Object.keys(now).every((k) => now[k] === was[k]);
-                if (same) await targetWorkspaceHandle.removeEntry(op.canvas, { recursive: true });
+                if (same) await removeFolder(targetWorkspaceHandle, op.canvas);
             }
         }
     }
@@ -552,7 +552,7 @@
                 off.title = 'Take this message back before the PC sees it';
                 off.addEventListener('click', async () => {
                     if (!confirm('Take this message back? It is deleted from Queued messages, and the agent will not see it.')) return;
-                    try { await (await targetWorkspaceHandle.getDirectoryHandle(QUEUE)).removeEntry(m.dir, { recursive: true }); } catch { /* already gone */ }
+                    try { await removeFolder(await targetWorkspaceHandle.getDirectoryHandle(QUEUE), m.dir); } catch { /* already gone */ }
                     refreshPhoneChat();
                 });
                 li.append(off);

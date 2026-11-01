@@ -10464,7 +10464,7 @@ function showFabricContextMenu(x, y, fabricName, assigned = false) {
             const oldH = await targetWorkspaceHandle.getDirectoryHandle(oldName);
             const newH = await targetWorkspaceHandle.getDirectoryHandle(newName, { create: true });
             await copyDirectory(oldH, newH);
-            await targetWorkspaceHandle.removeEntry(oldName, { recursive: true });
+            await removeFolder(targetWorkspaceHandle, oldName);
             loadFabricsGrid();
         } catch (err) { console.error(err); alert('Failed to rename fabric.'); }
     };
@@ -10480,7 +10480,7 @@ function showFabricContextMenu(x, y, fabricName, assigned = false) {
         menu.remove();
         if (!confirm(`Are you sure you want to delete '${activeContextFabric}'? This cannot be undone.`)) return;
         try {
-            await targetWorkspaceHandle.removeEntry(activeContextFabric, { recursive: true });
+            await removeFolder(targetWorkspaceHandle, activeContextFabric);
             loadFabricsGrid();
         } catch (err) { console.error(err); alert('Failed to delete fabric.'); }
     };
@@ -10535,7 +10535,7 @@ document.getElementById('btn-rename-fabric')?.addEventListener('click', async ()
         const newFabricHandle = await targetWorkspaceHandle.getDirectoryHandle(newName, { create: true });
         
         await copyDirectory(oldFabricHandle, newFabricHandle);
-        await targetWorkspaceHandle.removeEntry(oldName, { recursive: true });
+        await removeFolder(targetWorkspaceHandle, oldName);
         
         loadFabricsGrid();
     } catch (err) {
@@ -10551,13 +10551,28 @@ document.getElementById('btn-delete-fabric')?.addEventListener('click', async ()
     if (!confirm(`Are you sure you want to delete the fabric '${name}'? This cannot be undone.`)) return;
     
     try {
-        await targetWorkspaceHandle.removeEntry(name, { recursive: true });
+        await removeFolder(targetWorkspaceHandle, name);
         loadFabricsGrid();
     } catch (err) {
         console.error('Failed to delete fabric:', err);
         alert('Failed to delete fabric.');
     }
 });
+
+/* A folder removed with everything in it. Edge and Chrome on Android refuse a
+ * recursive remove with TypeMismatchError, though they remove files and empty
+ * folders, so there it is emptied from the bottom up first (t-7b1443b8ce). */
+async function removeFolder(parent, name) {
+    try { await parent.removeEntry(name, { recursive: true }); return; } catch (e) { if (e.name !== 'TypeMismatchError') throw e; }
+    const dir = await parent.getDirectoryHandle(name);
+    const entries = [];
+    for await (const e of dir.values()) entries.push(e);
+    for (const e of entries) {
+        if (e.kind === 'directory') await removeFolder(dir, e.name);
+        else await dir.removeEntry(e.name);
+    }
+    await parent.removeEntry(name);
+}
 
 async function copyDirectory(srcDir, destDir) {
     for await (const entry of srcDir.values()) {
