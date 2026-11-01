@@ -282,13 +282,33 @@
 
     setupBtn.addEventListener('click', async () => {
         if (!targetWorkspaceHandle) { alert('Open your target folder first.'); return; }
+        // Every step says how it went: a failure here once left nothing on screen (t-2214f3ca16).
+        const fail = (step, e) => {
+            const why = `${step}: ${e && e.name ? `${e.name} - ${e.message}` : e}`;
+            stateEl.textContent = `Set up failed. ${why}`;
+            alert(`Set up USB sync failed.\n\n${why}`);
+        };
+        const folder = targetWorkspaceHandle;
+        // Write access first, while the tap still counts as one: it is gone once the name prompt has been open a while.
+        try {
+            let perm = folder.queryPermission ? await folder.queryPermission({ mode: 'readwrite' }) : 'granted';
+            if (perm !== 'granted' && folder.requestPermission) perm = await folder.requestPermission({ mode: 'readwrite' });
+            if (perm !== 'granted') { fail('Write access', `CanvasXP may only read "${folder.name}". Allow editing when the browser asks, or open the folder again from the home screen.`); return; }
+        } catch (e) { fail('Write access', e); return; }
         const name = (prompt('A name for this phone, shown in NoteX on the PC:', 'My phone') || '').trim();
         if (!name) return;
-        const dir = await xpDir(true);
-        const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
-        await writeJson(dir, 'device.json', { id, name, app: 'CanvasXP', createdAt: new Date().toISOString() });
-        await serial(refreshManifest);
-        await showState();
+        setupBtn.disabled = true;
+        stateEl.textContent = 'Setting up…';
+        try {
+            let dir;
+            try { dir = await folder.getDirectoryHandle(XP, { create: true }); } catch (e) { fail(`Making the ${XP} folder in "${folder.name}"`, e); return; }
+            const id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`);
+            try { await writeJson(dir, 'device.json', { id, name, app: 'CanvasXP', createdAt: new Date().toISOString() }); } catch (e) { fail('Writing device.json', e); return; }
+            const back = await readJson(dir, 'device.json');
+            if (!back || back.id !== id) { fail('Reading device.json back', 'it was written but does not read back the same.'); return; }
+            try { await serial(refreshManifest); } catch (e) { fail('Writing manifest.json', e); return; }
+            await showState(`Set up: "${folder.name}" now holds ${XP}/device.json and manifest.json.`);
+        } finally { setupBtn.disabled = false; }
     });
 
     async function onHome() {
