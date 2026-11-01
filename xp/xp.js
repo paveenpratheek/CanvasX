@@ -789,6 +789,20 @@
         tabletRow.after(note);
     }
 
+    /* ----------------------------------- the agent chat as a sheet from the bottom */
+
+    // Folded, the chat is a bar along the bottom (t-02e85bc11b): its button points the way it
+    // will go, and a tap anywhere on the bar opens it.
+    const chatEl = document.getElementById('agent-chat');
+    const foldBtn = document.getElementById('agent-chat-fold');
+    const showFold = () => { foldBtn.textContent = chatEl.classList.contains('folded') ? '▴' : '▾'; };
+    foldBtn.addEventListener('click', showFold); // after CanvasX's own handler, which folds it
+    chatEl.querySelector('.agent-chat-head').addEventListener('click', (e) => {
+        if (chatEl.classList.contains('folded') && !e.target.closest('#agent-chat-fold')) foldBtn.click();
+    });
+    new MutationObserver(showFold).observe(chatEl, { attributes: true, attributeFilter: ['class'] });
+    showFold();
+
     /* ------------------------------------------------- wrapping CanvasX */
 
     const origInit = initializeWorkspace;

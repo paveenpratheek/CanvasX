@@ -33,9 +33,35 @@
 .xp-unqueue { display: block; margin: 6px 0 0 auto; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--panel-border); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
 .xp-unqueue:hover { color: var(--text-color); border-color: var(--accent); }
 
-@media (max-width: 640px) {
-    body.agent-view #agent-chat { left: 8px; right: 8px; width: auto; max-width: none; top: auto; bottom: 8px; height: min(58vh, 520px); }
-    body.agent-view #agent-chat.folded { height: auto; }
+/* ---------------------------------------------------------------- the phone layout (t-02e85bc11b)
+ * The page itself never scrolls or widens: only the canvas moves under the fixed pieces. */
+html, body { overflow: hidden; overscroll-behavior: none; }
+#workspace { overflow: hidden; }
+
+@media (max-width: 640px), (max-height: 500px) {
+    /* The toolbar: one row at the top, scrolling sideways inside itself when the tools do not fit */
+    #toolbar {
+        top: 8px; padding: 6px 10px; gap: 10px; border-radius: 14px;
+        flex-wrap: nowrap; justify-content: flex-start;
+        max-width: calc(100vw - 16px); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    }
+    #toolbar::-webkit-scrollbar { display: none; }
+    #toolbar .tool-group { flex: none; gap: 4px; }
+    .instructions { display: none; }
+
+    /* The agent canvas notice: a slim chip under the toolbar */
+    body.agent-view #agent-banner { top: 62px; padding: 4px 12px; border-radius: 999px; max-width: calc(100vw - 32px); white-space: nowrap; }
+    body.agent-view #agent-banner span { display: none; }
+
+    /* The agent chat: a sheet from the bottom; folded, a bar along the bottom */
+    body.agent-view #agent-chat {
+        left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none;
+        height: min(62dvh, 560px); border-radius: 16px 16px 0 0; border-bottom: none;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    body.agent-view #agent-chat.folded { top: auto; bottom: 0; height: auto; }
+    #agent-chat .agent-chat-head { cursor: pointer; }
+    #agent-chat-fold { width: 32px; height: 32px; font-size: 18px; }
 }
 
 /* NoteX at work: the popup, and the slim bar it hides to */

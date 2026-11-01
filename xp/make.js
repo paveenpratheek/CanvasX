@@ -30,6 +30,8 @@ const swap = (from, to) => {
 };
 swap(/<html lang="en">/, '<html lang="en" data-edition="portable">');
 swap(/<title>[^<]*<\/title>/, '<title>CanvasXP</title>');
+// The keyboard makes the page shorter, so the chat sheet stays above it instead of the browser moving the page.
+swap(/(<meta name="viewport" content="[^"]*)(")/, '$1, interactive-widget=resizes-content$2');
 // Every build is a new address for CanvasX's own files too, so a phone never keeps an old copy.
 swap(/<link rel="stylesheet" href="style\.css\?v=[^"]*">/, `<link rel="stylesheet" href="style.css?v=${version}">\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
 swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
