@@ -129,6 +129,16 @@ body.xp-phone .home-actions { flex-wrap: nowrap; gap: 8px; }
 body.xp-phone #btn-theme-home { width: 44px; height: 44px; padding: 0; border-radius: 12px; background: var(--xp-card); border: 1px solid var(--panel-border); color: var(--text-color); }
 body.xp-phone .home-screen:has(#workspace-content:not(.hidden)) #btn-open-workspace { display: none; }
 body.xp-phone #btn-open-workspace { min-height: 44px; }
+/* Restore Previous Workspace and, beside it, Change target folder (t-6a62beb22c): on a phone a row of their own under the name */
+.xp-open-row { display: flex; gap: 12px; flex-wrap: wrap; }
+#xp-change-folder[hidden] { display: none; }
+body.xp-phone .home-header { flex-wrap: wrap; row-gap: 14px; }
+body.xp-phone .home-actions { display: contents; }
+body.xp-phone #btn-theme-home { margin-left: auto; }
+body.xp-phone .xp-open-row { flex: 1 0 100%; gap: 8px; }
+body.xp-phone .home-screen:has(#workspace-content:not(.hidden)) .xp-open-row { display: none; }
+body.xp-phone .xp-open-row .home-btn { flex: 1 1 0; min-width: 0; min-height: 48px; padding: 6px 12px; line-height: 1.25; text-align: center; }
+body.xp-phone #xp-change-folder { background: var(--xp-card); border: 1px solid var(--panel-border); color: var(--text-color); }
 
 body.xp-phone .xp-folder-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px 8px 20px; font-size: 14px; color: var(--text-secondary); }
 body.xp-phone .xp-folder-row strong { color: var(--text-color); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

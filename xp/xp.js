@@ -853,12 +853,34 @@
         h1.before(titles);
         titles.append(h1, make('span', 'xp-home-sub', 'Your canvases, on this phone'));
         const folderRow = make('div', 'xp-folder-row', `${svg(ICONS.folder, 16)}<span class="xp-folder-label">Folder</span><strong id="xp-folder-name"></strong>`);
+        // Picking another folder: once one is picked, Restore no longer means anything (t-6a62beb22c).
+        const openBtn = document.getElementById('btn-open-workspace');
+        const pickFolder = async () => {
+            const before = targetWorkspaceHandle;
+            await (window.originalBtnOpenWorkspaceClick || openBtn.onclick)();
+            if (targetWorkspaceHandle && targetWorkspaceHandle !== before) {
+                openBtn.textContent = 'Open Target Workspace';
+                if (window.originalBtnOpenWorkspaceClick) openBtn.onclick = window.originalBtnOpenWorkspaceClick;
+            }
+        };
         const change = make('button', 'xp-link-btn', 'Change');
         change.type = 'button';
-        change.addEventListener('click', () => (window.originalBtnOpenWorkspaceClick || document.getElementById('btn-open-workspace').onclick)());
+        change.addEventListener('click', pickFolder);
         folderRow.append(change);
         const content = document.getElementById('workspace-content');
         content.prepend(folderRow);
+        // Beside Restore Previous Workspace, a way to pick a different folder instead.
+        const openRow = make('div', 'xp-open-row');
+        openBtn.before(openRow);
+        const changeTarget = make('button', 'home-btn', 'Change target folder');
+        changeTarget.id = 'xp-change-folder';
+        changeTarget.type = 'button';
+        changeTarget.addEventListener('click', pickFolder);
+        openRow.append(openBtn, changeTarget);
+        const showChange = () => { changeTarget.hidden = !(content.classList.contains('hidden') && /restore/i.test(openBtn.textContent)); };
+        new MutationObserver(showChange).observe(openBtn, { childList: true, characterData: true, subtree: true });
+        new MutationObserver(showChange).observe(content, { attributes: true, attributeFilter: ['class'] });
+        showChange();
         const newBtn = document.getElementById('btn-new-fabric');
         for (const n of newBtn.childNodes) if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' New canvas ';
     }
