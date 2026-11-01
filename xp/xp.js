@@ -88,6 +88,22 @@
         }
     }
 
+    // Stroke icons for the phone layout (t-1c580a5971).
+    const svg = (d, size = 20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const ICONS = {
+        usb: '<path d="M12 3v13"/><path d="M8 7l4-4 4 4"/><path d="M6 13v3a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-3"/><circle cx="12" cy="20" r="1.5"/>',
+        folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+        back: '<path d="M15 18l-6-6 6-6"/>',
+        more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
+        eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+        chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+        up: '<path d="M6 15l6-6 6 6"/>',
+        down: '<path d="M6 9l6 6 6-6"/>',
+        pc: '<rect x="2" y="4" width="14" height="10" rx="2"/><path d="M6 18h6"/><path d="M9 14v4"/><rect x="18" y="8" width="4" height="10" rx="1"/>',
+        robot: '<rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/>',
+        chevron: '<path d="M9 6l6 6-6 6"/>',
+    };
+
     /* ----------------------------------------------------------- manifest */
 
     let manifestTimer = null;
@@ -315,11 +331,19 @@
     const panel = document.createElement('div');
     panel.id = 'xp-sync';
     panel.className = 'xp-sync hidden';
-    panel.innerHTML = '<div class="xp-sync-text"><strong>USB sync</strong> <span id="xp-sync-state"></span></div><button id="xp-setup" class="home-btn">Set up USB sync</button>';
+    panel.innerHTML = `<span class="xp-sync-icon">${svg(ICONS.usb, 18)}</span><div class="xp-sync-text"><strong id="xp-sync-title">USB sync</strong> <span id="xp-sync-state"></span></div><div class="xp-sync-progress" hidden><span></span></div><button id="xp-setup" class="home-btn">Set up USB sync</button>`;
     const header = document.querySelector('#workspace-content .workspace-header');
     header.parentNode.insertBefore(panel, header.nextSibling);
     const stateEl = panel.querySelector('#xp-sync-state');
     const setupBtn = panel.querySelector('#xp-setup');
+    const titleEl = panel.querySelector('#xp-sync-title');
+    const progressEl = panel.querySelector('.xp-sync-progress');
+    // "n of N" in a step's text fills the card's bar (t-1c580a5971).
+    const showProgress = (text) => {
+        const m = /(\d+) of (\d+)/.exec(text || '');
+        progressEl.hidden = !m;
+        if (m) progressEl.firstElementChild.style.width = `${Math.max(3, Math.round((100 * Number(m[1])) / Math.max(1, Number(m[2]))))}%`;
+    };
 
     const when = (iso) => { try { return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); } catch { return iso; } };
 
@@ -328,13 +352,15 @@
         const dev = dir && (await readJson(dir, 'device.json'));
         panel.classList.remove('hidden');
         setupBtn.hidden = Boolean(dev);
+        showProgress(null);
+        titleEl.textContent = dev ? `USB sync · ${dev.name}` : 'USB sync';
         if (!dev) {
             stateEl.textContent = 'Not set up. Set it up, then plug the phone into the PC and pick this folder in NoteX.';
             return;
         }
         const m = (await readJson(dir, 'manifest.json')) || {};
         const waiting = (await waitingBatches()).length;
-        const parts = [`This phone is "${dev.name}".`];
+        const parts = []; // the phone's name is in the card's title
         parts.push(m.lastSync ? `Last synced with ${m.lastSync.from} on ${when(m.lastSync.at)}.` : `Not synced yet - plug the phone into the PC, pick File transfer, and in NoteX open Phone and choose the folder "${targetWorkspaceHandle.name}".`);
         if (waiting) parts.push(`${waiting} change${waiting === 1 ? '' : 's'} from the PC still copying.`);
         const asks = (await queued()).length;
@@ -378,7 +404,7 @@
      * what it still waits for, or what went wrong (t-bae0747ece). */
     let takingIn = false;
     async function takeInShown() {
-        const show = (text) => { panel.classList.remove('hidden'); stateEl.textContent = text; };
+        const show = (text) => { panel.classList.remove('hidden'); stateEl.textContent = text; showProgress(text); };
         takingIn = true;
         try {
             const r = await serial(() => takeIn(show));
@@ -498,10 +524,16 @@
     const descBox = document.createElement('textarea');
     descBox.id = 'xp-chat-desc';
     descBox.rows = 2;
-    descBox.placeholder = 'Description - what the attachments are (optional)';
+    descBox.placeholder = 'Optional';
+    descBox.setAttribute('aria-label', 'Description - what the attachments are');
     const promptBox = document.getElementById('agent-chat-text');
     promptBox.parentNode.insertBefore(descBox, promptBox);
-    promptBox.placeholder = 'Prompt - what the agent should do. It waits here and is answered at the next sync with the PC.';
+    promptBox.placeholder = 'Answered at the next sync with the PC';
+    promptBox.setAttribute('aria-label', 'Prompt - what the agent should do');
+    // Each box says what it is for, above it (t-1c580a5971).
+    const fieldLabel = (box, text) => { const l = document.createElement('label'); l.className = 'xp-field-label'; l.htmlFor = box.id; l.textContent = text; box.before(l); };
+    fieldLabel(descBox, 'Description · what the attachments are');
+    fieldLabel(promptBox, 'Prompt · what the agent should do');
 
     async function refreshPhoneChat() {
         const name = currentFabricName;
@@ -565,7 +597,7 @@
         document.getElementById('agent-chat-send').disabled = !dev;
         if (!dev) setChatState('Set up USB sync on the home screen first', true);
         else if (syncing) setChatState('syncing with the PC');
-        else setChatState(waiting.length ? `${waiting.length} waiting for the PC` : '');
+        else setChatState(waiting.length ? `${waiting.length} message${waiting.length === 1 ? '' : 's'} wait${waiting.length === 1 ? 's' : ''} for the PC` : 'Answered at the next sync with the PC');
     }
 
     async function sendPhoneChat() {
@@ -636,7 +668,9 @@
     pop.id = 'xp-pop';
     pop.className = 'xp-pop';
     pop.hidden = true;
-    pop.innerHTML = '<div class="xp-pop-card" role="status" aria-live="polite"><div class="xp-pop-title"></div><div class="xp-pop-text"></div><div class="xp-pop-bar"><span></span></div><div class="xp-pop-count"></div><div class="xp-pop-actions"><button class="home-btn xp-pop-home" hidden>Go to the home screen</button><button class="home-btn xp-pop-close">Hide</button></div></div>';
+    pop.innerHTML = `<div class="xp-pop-card" role="status" aria-live="polite"><div class="xp-pop-head"><span class="xp-pop-icon">${svg(ICONS.pc)}</span><div class="xp-pop-titles"><div class="xp-pop-title"></div><div class="xp-pop-text"></div></div></div><div class="xp-pop-bar"><span></span></div><div class="xp-pop-count"></div>`
+        + '<ol class="xp-pop-steps"><li data-step="reading">Read what changed on the phone</li><li data-step="agent">The agent answers your messages</li><li data-step="sending">Send the canvases and answers back</li></ol>'
+        + '<div class="xp-pop-actions"><button class="home-btn xp-pop-home" hidden>Go to the home screen</button><button class="home-btn xp-pop-close">Hide</button></div></div>';
     const pill = document.createElement('button');
     pill.id = 'xp-pill';
     pill.className = 'xp-pill';
@@ -659,6 +693,16 @@
         pop.classList.toggle('bad', Boolean(v.bad));
         q('.xp-pop-home').hidden = !v.home;
         q('.xp-pop-close').textContent = v.final ? 'OK' : 'Hide';
+        // The sync's steps: done, under way, still to come (t-1c580a5971); the agent's only when it answers.
+        const order = ['reading', 'agent', 'sending', 'done'];
+        const at = order.indexOf(v.stage);
+        const steps = q('.xp-pop-steps');
+        steps.hidden = at < 0;
+        for (const li of steps.children) {
+            const i = order.indexOf(li.dataset.step);
+            li.className = i < at ? 'done' : i === at ? 'now' : '';
+            if (li.dataset.step === 'agent') li.hidden = !(current && current.sawAgent);
+        }
         const showPill = tucked && !v.final;
         pop.hidden = showPill;
         pill.hidden = !showPill;
@@ -681,17 +725,18 @@
     pill.addEventListener('click', () => { tucked = false; if (view) render(view); });
 
     function showStep(st) {
+        const sawAgent = Boolean(current && current.sync === st.sync && current.sawAgent) || st.stage === 'agent';
         if (!current || current.sync !== st.sync) { tucked = false; finishing = false; }
-        current = st;
+        current = { ...st, sawAgent };
         syncing = st.stage === 'done' || st.stage === 'failed' ? null : st;
         if (agentCanvas) refreshPhoneChat();
-        if (st.stage === 'done') { finish(st); return; }
+        if (st.stage === 'done') { finish(current); return; }
         if (st.stage === 'failed') { render({ title: 'The sync stopped', text: st.text, final: true, bad: true }); return; }
         if (st.stage === 'agent') {
-            render({ title: 'The agent is answering your messages', text: `${st.canvas ? `On "${st.canvas}". ` : ''}Keep the phone plugged in.`, bar: st.total ? st.done / st.total : 'busy', count: `${st.done} of ${st.total} answered` });
+            render({ stage: 'agent', title: 'The agent is answering your messages', text: `${st.canvas ? `On "${st.canvas}". ` : ''}Keep the phone plugged in.`, bar: st.total ? st.done / st.total : 'busy', count: `${st.done} of ${st.total} answered` });
             return;
         }
-        render({ title: 'NoteX is accessing your canvases', text: `${st.text || ''}. Keep the phone plugged in.`.replace(/^\. /, ''), bar: 'busy' });
+        render({ stage: st.stage === 'sending' ? 'sending' : 'reading', title: 'NoteX is accessing your canvases', text: `${st.text || ''}. Keep the phone plugged in.`.replace(/^\. /, ''), bar: 'busy' });
     }
 
     // The batches still waiting: does one change the canvas open here (an ordinary one, which
@@ -712,7 +757,7 @@
     async function finish(st) {
         if (finishing) return;
         finishing = true;
-        render({ title: 'Synced - bringing in the changes', text: st.text, bar: 'busy' });
+        render({ stage: 'sending', title: 'Synced - bringing in the changes', text: st.text, bar: 'busy' });
         for (let i = 0; i < 30 && current === st; i++) {
             if (await touchesOpenCanvas()) {
                 render({ title: 'Synced', text: `${st.text}. Go to the home screen to bring the PC's changes into "${currentFabricName}".`, bar: 1, ok: true, final: true, home: true });
@@ -729,12 +774,12 @@
                 if (r.taken && homeScreen && !homeScreen.classList.contains('hidden')) { await loadFabricsGrid(); await showState(); }
                 if (agentCanvas) refreshPhoneChat();
                 const aside = r.aside.length ? ` Your own changes were kept beside the PC's: ${r.aside.map((a) => `"${a.copy}"`).join(', ')}.` : '';
-                render({ title: 'Synced', text: `${st.text}.${aside}`, bar: 1, ok: true, final: true });
+                render({ stage: 'done', title: 'Synced', text: `${st.text}.${aside}`, bar: 1, ok: true, final: true });
                 return;
             }
             await new Promise((res) => setTimeout(res, POLL_MS));
         }
-        if (current === st) render({ title: 'Synced', text: `${st.text}. The PC's changes are still copying - they come in from the home screen.`, bar: 1, ok: true, final: true });
+        if (current === st) render({ stage: 'done', title: 'Synced', text: `${st.text}. The PC's changes are still copying - they come in from the home screen.`, bar: 1, ok: true, final: true });
     }
 
     async function pollStatus() {
@@ -789,13 +834,151 @@
         tabletRow.after(note);
     }
 
+    /* ------------------------------------------------------ the phone layout */
+
+    /* The approved phone design (t-1c580a5971), on a phone or a phone turned
+     * sideways: body.xp-phone switches it on. Every colour comes from CanvasX's
+     * theme variables, so its light/dark switch restyles it all. */
+    const phoneMQ = matchMedia('(max-width: 640px), (max-height: 500px)');
+    const setPhone = () => document.body.classList.toggle('xp-phone', phoneMQ.matches);
+    phoneMQ.addEventListener('change', setPhone);
+    setPhone();
+    const make = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+    const iconBtn = (id, label, d) => { const b = make('button', 'xp-icon-btn', svg(d)); b.id = id; b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; return b; };
+
+    // Home: a line under the name, the folder in use, and "New canvas".
+    {
+        const h1 = document.querySelector('.home-header h1');
+        const titles = make('div', 'xp-home-titles');
+        h1.before(titles);
+        titles.append(h1, make('span', 'xp-home-sub', 'Your canvases, on this phone'));
+        const folderRow = make('div', 'xp-folder-row', `${svg(ICONS.folder, 16)}<span class="xp-folder-label">Folder</span><strong id="xp-folder-name"></strong>`);
+        const change = make('button', 'xp-link-btn', 'Change');
+        change.type = 'button';
+        change.addEventListener('click', () => (window.originalBtnOpenWorkspaceClick || document.getElementById('btn-open-workspace').onclick)());
+        folderRow.append(change);
+        const content = document.getElementById('workspace-content');
+        content.prepend(folderRow);
+        const newBtn = document.getElementById('btn-new-fabric');
+        for (const n of newBtn.childNodes) if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' New canvas ';
+    }
+
+    // The canvases in two columns, the agent's apart in a list saying what waits for the PC.
+    const gridHead = make('div', 'xp-grid-head', '<h2>Canvases</h2><span id="xp-canvas-count"></span>');
+    const agentHead = make('div', 'xp-grid-head', '<h2>The agent\'s canvases</h2><span>view only</span>');
+    const agentGrid = make('div', 'xp-agent-grid');
+    agentGrid.id = 'xp-agent-grid';
+    {
+        const grid = document.getElementById('fabrics-grid');
+        grid.before(gridHead);
+        grid.after(agentHead, agentGrid);
+    }
+    async function arrangeGrid() {
+        const grid = document.getElementById('fabrics-grid');
+        const agents = [...grid.querySelectorAll('.fabric-card.agent-card')];
+        agentGrid.replaceChildren(...agents);
+        const own = grid.querySelectorAll('.fabric-card').length;
+        document.getElementById('xp-canvas-count').textContent = String(own);
+        gridHead.hidden = !own;
+        agentHead.hidden = agentGrid.hidden = !agents.length;
+        for (const card of agents) {
+            const name = card.querySelector('.fabric-card-info h3')?.textContent || '';
+            const icon = card.querySelector('.fabric-card-icon');
+            if (icon && !icon.querySelector('.xp-robot')) icon.insertAdjacentHTML('beforeend', `<span class="xp-robot">${svg(ICONS.robot, 18)}</span>`);
+            if (!card.querySelector('.xp-card-go')) card.insertAdjacentHTML('beforeend', `<span class="xp-card-go">${svg(ICONS.chevron, 18)}</span>`);
+            let n = 0;
+            try { n = (await queued(name)).length; } catch { /* no queue yet */ }
+            const p = card.querySelector('.fabric-card-info p');
+            if (p) p.textContent = n ? `${n} message${n === 1 ? '' : 's'} wait${n === 1 ? 's' : ''} for the PC` : 'View only';
+        }
+    }
+
+    // A canvas: a top bar - back, the canvas, what it is - and a zoom control.
+    const topbar = make('header', 'xp-topbar');
+    topbar.id = 'xp-topbar';
+    const backBtn = iconBtn('xp-back', 'Home', ICONS.back);
+    backBtn.addEventListener('click', () => document.getElementById('btn-home').click());
+    const tbTitles = make('div', 'xp-tb-titles', '<span id="xp-tb-name"></span><span id="xp-tb-sub"></span>');
+    const viewChip = make('span', 'xp-chip', `${svg(ICONS.eye, 14)}View only`);
+    viewChip.id = 'xp-view-chip';
+    const themeBtn = make('button', 'xp-icon-btn theme-toggle', document.getElementById('btn-theme').innerHTML);
+    themeBtn.id = 'xp-theme';
+    themeBtn.type = 'button';
+    themeBtn.setAttribute('aria-label', 'Switch between light and dark');
+    themeBtn.addEventListener('click', () => toggleTheme());
+    const moreBtn = iconBtn('xp-more', 'Settings', ICONS.more);
+    moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const popup = document.getElementById('settings-popup');
+        const open = popup.style.display !== 'block';
+        popup.style.display = open ? 'block' : 'none';
+        if (open) {
+            document.getElementById('graphics-preset-select').value = state.graphicsPreset || 'performance';
+            palettePopup.classList.remove('active');
+        }
+    });
+    topbar.append(backBtn, tbTitles, viewChip, themeBtn, moreBtn);
+    const zoomBox = make('div', 'xp-zoom');
+    zoomBox.id = 'xp-zoom';
+    const zoomOut = make('button', null, '−');
+    const zoomPct = make('span', 'xp-zoom-pct', '100%');
+    const zoomIn = make('button', null, '+');
+    zoomOut.type = zoomIn.type = 'button';
+    zoomOut.setAttribute('aria-label', 'Zoom out');
+    zoomIn.setAttribute('aria-label', 'Zoom in');
+    zoomOut.addEventListener('click', () => keyZoom(1 / 1.25));
+    zoomIn.addEventListener('click', () => keyZoom(1.25));
+    zoomBox.append(zoomOut, zoomPct, zoomIn);
+    document.body.append(topbar, zoomBox);
+    setInterval(() => {
+        if (!document.body.classList.contains('xp-phone') || document.hidden) return;
+        const t = `${Math.round(state.camera.zoom * 100)}%`;
+        if (zoomPct.textContent !== t) zoomPct.textContent = t;
+    }, 250);
+
+    // The tools: a dock at the bottom, each with its name; home and theme live in the top bar.
+    const TOOL_NAMES = { 'btn-select': 'Move', 'btn-pan': 'Pan', 'btn-draw': 'Pen', 'btn-delete': 'Erase', 'btn-text': 'Text', 'btn-notepad': 'Note', 'btn-line': 'Line', 'btn-arrow': 'Arrow', 'btn-rect': 'Box', 'btn-book': 'Book', 'btn-folder': 'Folder', 'btn-circle': 'Circle', 'btn-totem': 'Totem', 'btn-elements': 'Board' };
+    for (const [id, name] of Object.entries(TOOL_NAMES)) {
+        const b = document.getElementById(id);
+        if (b && !b.querySelector('.xp-tool-label')) b.append(make('span', 'xp-tool-label', name));
+    }
+    const dockHint = make('div', 'xp-dock-hint', 'Swipe the tools for more');
+    dockHint.id = 'xp-dock-hint';
+    document.body.append(dockHint);
+    document.getElementById('toolbar').addEventListener('scroll', () => dockHint.classList.add('seen'), { passive: true });
+
+    // What the top bar says follows the canvas open; on the home screen it is gone.
+    function updateChrome() {
+        const onCanvas = Boolean(currentFabricName) && homeScreen.classList.contains('hidden');
+        document.body.classList.toggle('xp-on-canvas', onCanvas);
+        document.getElementById('xp-tb-name').textContent = currentFabricName || '';
+        document.getElementById('xp-tb-sub').textContent = agentCanvas ? 'Drawn by NoteX from the agent\'s scripts' : 'Saved on this phone';
+        const folder = document.getElementById('xp-folder-name');
+        if (folder) folder.textContent = targetWorkspaceHandle ? targetWorkspaceHandle.name : '';
+    }
+    new MutationObserver(updateChrome).observe(homeScreen, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(updateChrome).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    updateChrome();
+
     /* ----------------------------------- the agent chat as a sheet from the bottom */
 
-    // Folded, the chat is a bar along the bottom (t-02e85bc11b): its button points the way it
-    // will go, and a tap anywhere on the bar opens it.
+    // Folded, the chat is a bar along the bottom (t-02e85bc11b): a handle, the chat's icon, what
+    // waits, and a chevron pointing the way it will go; a tap anywhere on the bar opens it.
     const chatEl = document.getElementById('agent-chat');
     const foldBtn = document.getElementById('agent-chat-fold');
-    const showFold = () => { foldBtn.textContent = chatEl.classList.contains('folded') ? '▴' : '▾'; };
+    {
+        const head = chatEl.querySelector('.agent-chat-head');
+        chatEl.prepend(make('div', 'xp-sheet-handle', '<span></span>'));
+        const titles = make('div', 'xp-chat-titles');
+        const strong = head.querySelector('strong');
+        strong.before(make('span', 'xp-chat-icon', svg(ICONS.chat, 18)), titles);
+        titles.append(strong, document.getElementById('agent-chat-state'));
+    }
+    const showFold = () => {
+        const folded = chatEl.classList.contains('folded');
+        foldBtn.dataset.dir = folded ? 'up' : 'down';
+        foldBtn.innerHTML = svg(folded ? ICONS.up : ICONS.down);
+    };
     foldBtn.addEventListener('click', showFold); // after CanvasX's own handler, which folds it
     chatEl.querySelector('.agent-chat-head').addEventListener('click', (e) => {
         if (chatEl.classList.contains('folded') && !e.target.closest('#agent-chat-fold')) foldBtn.click();
@@ -808,6 +991,7 @@
     const origInit = initializeWorkspace;
     initializeWorkspace = async function () {
         await origInit.apply(this, arguments);
+        updateChrome();
         await tick(); // what NoteX left before the folder was opened is not news
         await onHome();
     };
@@ -827,6 +1011,7 @@
     const origGrid = loadFabricsGrid;
     loadFabricsGrid = async function () {
         const r = await origGrid.apply(this, arguments);
+        await arrangeGrid();
         scheduleManifest();
         return r;
     };

@@ -1,7 +1,30 @@
 /* CanvasXP only (t-66914c8b0f): the USB sync panel on the home screen, the
  * agent chat whose messages wait for the PC (t-3e75a404cf), the popup while
- * NoteX syncs (t-8cbbaa2aad), and a home screen that fits a phone. */
+ * NoteX syncs (t-8cbbaa2aad), and the phone layout (t-02e85bc11b,
+ * t-1c580a5971). Colours are CanvasX's theme variables, so its light/dark
+ * switch restyles everything here. */
 
+:root {
+    --xp-ground: #141418;
+    --xp-card: #1d1d24;
+    --xp-field: #26262f;
+    --xp-line: rgba(255, 255, 255, 0.09);
+    --xp-accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+    --xp-accent-text: #c7d2fe;
+    --xp-ok: #15803d;
+    --xp-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+:root[data-theme="light"] {
+    --xp-ground: #f4f4f6;
+    --xp-card: #ffffff;
+    --xp-field: #f1f1f5;
+    --xp-line: rgba(15, 23, 42, 0.1);
+    --xp-accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    --xp-accent-text: #4338ca;
+    --xp-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+}
+
+/* ------------------------------------------------------------------ USB sync */
 .xp-sync {
     display: flex;
     align-items: center;
@@ -16,8 +39,12 @@
     line-height: 1.45;
 }
 .xp-sync.hidden { display: none; }
+.xp-sync-icon { display: none; }
 .xp-sync-text { flex: 1 1 260px; min-width: 0; }
 .xp-sync-text strong { margin-right: 6px; }
+.xp-sync-progress { flex: 1 0 100%; height: 6px; border-radius: 999px; background: var(--xp-line); overflow: hidden; }
+.xp-sync-progress[hidden] { display: none; }
+.xp-sync-progress span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.3s ease; }
 
 @media (max-width: 640px) {
     .home-header { flex-wrap: wrap; gap: 12px; }
@@ -26,63 +53,53 @@
     #workspace-path-label { font-size: 18px; overflow-wrap: anywhere; }
 }
 
-/* Messages waiting for the PC, in the agent chat */
-#agent-chat-log li.queued { background: none; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+/* Pieces only the phone layout shows */
+.xp-home-sub, .xp-folder-row, .xp-grid-head, .xp-topbar, .xp-zoom, .xp-dock-hint, .xp-tool-label,
+.xp-sheet-handle, .xp-chat-icon, .xp-robot, .xp-card-go, .xp-pop-icon, .xp-field-label { display: none; }
+.xp-agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 24px; margin-top: 24px; }
+.xp-agent-grid[hidden], .xp-grid-head[hidden] { display: none !important; }
+
+/* ------------------------------------------------- messages waiting for the PC */
+#agent-chat-log li.queued { background: none; border: 1.5px dashed color-mix(in srgb, var(--accent) 60%, transparent); }
 #agent-chat-log li.queued.bad { border-color: #ef4444; color: inherit; }
 #agent-chat-log li.queued.bad .attached:last-of-type { color: #ef4444; }
-.xp-unqueue { display: block; margin: 6px 0 0 auto; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--panel-border); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.xp-unqueue { display: block; margin: 8px 0 0 auto; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--panel-border); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
 .xp-unqueue:hover { color: var(--text-color); border-color: var(--accent); }
 
-/* ---------------------------------------------------------------- the phone layout (t-02e85bc11b)
- * The page itself never scrolls or widens: only the canvas moves under the fixed pieces. */
+/* The page itself never scrolls or widens: only the canvas moves under the fixed pieces. */
 html, body { overflow: hidden; overscroll-behavior: none; }
 #workspace { overflow: hidden; }
 
-@media (max-width: 640px), (max-height: 500px) {
-    /* The toolbar: one row at the top, scrolling sideways inside itself when the tools do not fit */
-    #toolbar {
-        top: 8px; padding: 6px 10px; gap: 10px; border-radius: 14px;
-        flex-wrap: nowrap; justify-content: flex-start;
-        max-width: calc(100vw - 16px); overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
-    }
-    #toolbar::-webkit-scrollbar { display: none; }
-    #toolbar .tool-group { flex: none; gap: 4px; }
-    .instructions { display: none; }
-
-    /* The agent canvas notice: a slim chip under the toolbar */
-    body.agent-view #agent-banner { top: 62px; padding: 4px 12px; border-radius: 999px; max-width: calc(100vw - 32px); white-space: nowrap; }
-    body.agent-view #agent-banner span { display: none; }
-
-    /* The agent chat: a sheet from the bottom; folded, a bar along the bottom */
-    body.agent-view #agent-chat {
-        left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none;
-        height: min(62dvh, 560px); border-radius: 16px 16px 0 0; border-bottom: none;
-        padding-bottom: env(safe-area-inset-bottom);
-    }
-    body.agent-view #agent-chat.folded { top: auto; bottom: 0; height: auto; }
-    #agent-chat .agent-chat-head { cursor: pointer; }
-    #agent-chat-fold { width: 32px; height: 32px; font-size: 18px; }
-}
-
-/* NoteX at work: the popup, and the slim bar it hides to */
-.xp-pop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, 0.55); }
+/* -------------------------------------------- NoteX at work: the popup and pill */
+.xp-pop { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, 0.55); }
 .xp-pop[hidden] { display: none; }
-.xp-pop-card { width: min(420px, 100%); padding: 20px; border-radius: 16px; background: var(--panel-bg-solid); color: var(--text-color); border: 1px solid var(--panel-border); box-shadow: var(--shadow-pop); }
-.xp-pop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-.xp-pop.ok .xp-pop-title::before { content: '\2713'; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 13px; vertical-align: 2px; }
+.xp-pop-card { width: min(420px, 100%); box-sizing: border-box; padding: 20px; border-radius: 18px; background: var(--xp-card); color: var(--text-color); border: 1px solid var(--panel-border); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 12px; }
+.xp-pop-head { display: flex; align-items: center; gap: 12px; }
+.xp-pop-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xp-pop-title { font-size: 17px; font-weight: 600; }
+.xp-pop.ok .xp-pop-title::before { content: '\2713'; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%; background: var(--xp-ok); color: #fff; font-size: 13px; vertical-align: 2px; }
 .xp-pop.bad .xp-pop-title { color: #ef4444; }
 .xp-pop-text { font-size: 14px; line-height: 1.45; color: var(--text-secondary); overflow-wrap: anywhere; }
-.xp-pop-bar { position: relative; height: 8px; margin: 16px 0 6px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.xp-pop-bar { position: relative; height: 8px; border-radius: 999px; overflow: hidden; background: var(--xp-line); }
 .xp-pop-bar[hidden] { display: none; }
 .xp-pop-bar span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
-.xp-pop.ok .xp-pop-bar span { background: #16a34a; }
+.xp-pop.ok .xp-pop-bar span { background: var(--xp-ok); }
 .xp-pop-bar.busy span { width: 35%; animation: xp-busy 1.3s ease-in-out infinite; }
 @keyframes xp-busy { from { left: -35%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .xp-pop-bar.busy span { animation: none; width: 100%; opacity: 0.5; } }
 .xp-pop-count { font-size: 13px; color: var(--text-secondary); min-height: 1em; }
-.xp-pop-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.xp-pop-count:empty { display: none; }
+.xp-pop-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--text-secondary); }
+.xp-pop-steps[hidden], .xp-pop-steps li[hidden] { display: none; }
+.xp-pop-steps li { display: flex; align-items: center; gap: 10px; }
+.xp-pop-steps li::before { content: ''; flex: none; width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--xp-line); }
+.xp-pop-steps li.now { color: var(--text-color); }
+.xp-pop-steps li.now::before { border-color: var(--accent); }
+.xp-pop-steps li.done { color: var(--text-color); }
+.xp-pop-steps li.done::before { content: '\2713'; display: grid; place-items: center; border: none; background: var(--xp-ok); color: #fff; font-size: 12px; font-weight: 700; }
+.xp-pop-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .xp-pop-actions [hidden] { display: none; }
-.xp-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg-solid); color: var(--text-color); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.xp-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 100000; max-width: calc(100vw - 32px); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--xp-card); color: var(--text-color); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .xp-pill[hidden] { display: none; }
 
 /* Settings: what touch does, in place of the Tablet Mode switch */
@@ -97,3 +114,136 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 #xp-chat-desc:focus { border-color: var(--accent); }
 #agent-chat.folded #xp-chat-desc { display: none; }
 #agent-chat-log .xp-desc { display: block; margin-bottom: 4px; padding-left: 8px; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text-secondary); font-style: italic; }
+
+/* =====================================================================================
+ * The phone layout (t-1c580a5971): on a phone, or a phone turned sideways.
+ * ===================================================================================== */
+
+/* -------------------------------------------------------------------- home */
+body.xp-phone .home-screen { padding: 0 0 96px; background: var(--xp-ground); color: var(--text-color); }
+body.xp-phone .home-header { margin: 0; padding: 16px 16px 8px 20px; flex-wrap: nowrap; }
+body.xp-phone .xp-home-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+body.xp-phone .home-header h1 { font-size: 24px; letter-spacing: -0.02em; color: var(--text-color); }
+body.xp-phone .xp-home-sub { display: block; font-size: 13px; color: var(--text-secondary); }
+body.xp-phone .home-actions { flex-wrap: nowrap; gap: 8px; }
+body.xp-phone #btn-theme-home { width: 44px; height: 44px; padding: 0; border-radius: 12px; background: var(--xp-card); border: 1px solid var(--panel-border); color: var(--text-color); }
+body.xp-phone .home-screen:has(#workspace-content:not(.hidden)) #btn-open-workspace { display: none; }
+body.xp-phone #btn-open-workspace { min-height: 44px; }
+
+body.xp-phone .xp-folder-row { display: flex; align-items: center; gap: 8px; padding: 4px 12px 8px 20px; font-size: 14px; color: var(--text-secondary); }
+body.xp-phone .xp-folder-row strong { color: var(--text-color); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.xp-phone .xp-link-btn { margin-left: auto; min-height: 44px; padding: 0 8px; border: none; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+:root:not([data-theme="light"]) body.xp-phone .xp-link-btn { color: #a5b4fc; }
+
+body.xp-phone .workspace-header { margin: 0; padding: 0; border: none; }
+body.xp-phone #workspace-path-label { display: none; }
+body.xp-phone #btn-new-fabric { position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 5; height: 52px; padding: 0 20px 0 16px; border-radius: 16px; font-size: 15px; box-shadow: var(--xp-shadow); }
+
+body.xp-phone .xp-sync { margin: 0 16px 16px; padding: 14px 16px; border-radius: 16px; background: var(--xp-card); border: 1px solid var(--panel-border); gap: 10px 12px; flex-wrap: wrap; }
+body.xp-phone .xp-sync-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--xp-accent-soft); color: var(--xp-accent-text); align-self: flex-start; }
+body.xp-phone .xp-sync-text { flex: 1 1 0; font-size: 13px; color: var(--text-secondary); }
+body.xp-phone .xp-sync-text strong { display: block; margin: 0 0 1px; font-size: 15px; font-weight: 600; color: var(--text-color); }
+body.xp-phone #xp-setup { flex: 1 0 100%; min-height: 44px; background: var(--accent); color: #fff; }
+body.xp-phone #xp-setup[hidden] { display: none; }
+
+body.xp-phone .xp-grid-head { display: flex; align-items: baseline; justify-content: space-between; padding: 4px 20px 10px; }
+body.xp-phone .xp-grid-head h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-color); }
+body.xp-phone .xp-grid-head span { font-size: 13px; color: var(--text-secondary); }
+
+body.xp-phone .fabrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
+body.xp-phone .fabric-card { padding: 8px; gap: 8px; border-radius: 14px; background: var(--xp-card); border-color: var(--panel-border); }
+body.xp-phone .fabric-card-icon { height: 84px; border-radius: 9px; font-size: 26px; }
+body.xp-phone .fabric-card-info { padding: 0 4px 2px; }
+body.xp-phone .fabric-card-info h3 { font-size: 14px; font-weight: 500; margin: 0; color: var(--text-color); }
+body.xp-phone .fabrics-grid .fabric-card-info p { display: none; }
+body.xp-phone .fabric-card-options-btn { opacity: 1; top: 12px; right: 12px; width: 36px; height: 36px; }
+
+body.xp-phone .xp-agent-grid { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0 16px 16px; }
+body.xp-phone .xp-agent-grid .fabric-card { flex-direction: row; align-items: center; gap: 12px; min-height: 52px; padding: 8px 52px 8px 12px; }
+body.xp-phone .xp-agent-grid .fabric-card-icon { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--xp-accent-soft); color: var(--xp-accent-text); font-size: 0; }
+body.xp-phone .xp-agent-grid .fabric-card-icon img { display: none; }
+body.xp-phone .xp-agent-grid .xp-robot { display: grid; place-items: center; }
+body.xp-phone .xp-agent-grid .fabric-card-info { flex: 1; min-width: 0; padding: 0; }
+body.xp-phone .xp-agent-grid .fabric-card-info p { display: block; margin: 1px 0 0; font-size: 12px; color: var(--text-secondary); }
+body.xp-phone .xp-agent-grid .xp-card-go { display: none; }
+body.xp-phone .xp-agent-grid .fabric-card-options-btn { top: 50%; transform: translateY(-50%); right: 8px; background: none; color: var(--text-secondary); }
+
+/* ------------------------------------------------------- a canvas: the top bar */
+body.xp-phone.xp-on-canvas .xp-topbar {
+    display: flex; align-items: center; gap: 6px; position: fixed; left: 8px; right: 8px; top: 8px; z-index: 120;
+    height: 56px; box-sizing: border-box; padding: 0 6px; border-radius: 16px;
+    background: var(--panel-bg-solid); border: 1px solid var(--panel-border); box-shadow: var(--xp-shadow); color: var(--text-color);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.xp-icon-btn { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: none; border-radius: 12px; background: none; color: inherit; cursor: pointer; }
+.xp-icon-btn:active { background: var(--bg-hover); }
+.xp-tb-titles { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+#xp-tb-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#xp-tb-sub { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xp-chip { display: none; }
+body.xp-phone.agent-view .xp-chip { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 28px; padding: 0 10px; margin-right: 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); color: var(--xp-accent-text); font-size: 12px; font-weight: 600; }
+body.xp-phone.agent-view #xp-theme, body.xp-phone.agent-view #xp-more { display: none; }
+
+body.xp-phone.xp-on-canvas:not(.agent-view) .xp-zoom { display: flex; align-items: center; position: fixed; right: 12px; top: 76px; z-index: 110; border-radius: 12px; background: var(--panel-bg-solid); border: 1px solid var(--panel-border); color: var(--text-color); }
+.xp-zoom button { width: 44px; height: 40px; border: none; background: none; color: inherit; font-size: 20px; cursor: pointer; }
+.xp-zoom-pct { min-width: 44px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* What the phone layout takes over from CanvasX */
+body.xp-phone .instructions, body.xp-phone #agent-banner { display: none !important; }
+body.xp-phone #toolbar .tool-group:has(#btn-home), body.xp-phone #toolbar .separator, body.xp-phone #dropdown-settings { display: none !important; }
+body.xp-phone.agent-view #toolbar { display: none; }
+
+/* ------------------------------------------------------- the tool dock at the bottom */
+body.xp-phone #toolbar {
+    top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); left: 8px; right: 8px; transform: none; width: auto; max-width: none;
+    padding: 6px; gap: 4px; border-radius: 18px; flex-wrap: nowrap; justify-content: flex-start;
+    background: var(--panel-bg-solid); box-shadow: var(--xp-shadow);
+    overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+body.xp-phone #toolbar::-webkit-scrollbar { display: none; }
+body.xp-phone #toolbar .tool-group { flex: none; gap: 4px; }
+body.xp-phone #toolbar .tool-btn { flex-direction: column; gap: 3px; width: 56px; height: 56px; padding: 0; border-radius: 13px; color: var(--text-color); }
+body.xp-phone #toolbar .tool-btn svg { width: 22px; height: 22px; }
+body.xp-phone #toolbar .tool-btn.active { background: var(--accent); color: #fff; }
+body.xp-phone .xp-tool-label { display: block; font-size: 10px; font-weight: 500; line-height: 1; }
+body.xp-phone.xp-on-canvas:not(.agent-view) .xp-dock-hint:not(.seen) { display: block; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 99; padding: 4px 10px; border-radius: 999px; background: var(--panel-bg-solid); color: var(--text-secondary); font-size: 12px; pointer-events: none; }
+
+/* Popups the dock and top bar open: in reach, on the screen */
+body.xp-phone #color-palette-popup { top: auto !important; bottom: calc(96px + env(safe-area-inset-bottom)) !important; left: 50% !important; transform: translateX(-50%) !important; }
+body.xp-phone #settings-popup { left: auto !important; right: 8px !important; top: 72px !important; max-width: calc(100vw - 16px); }
+
+/* ------------------------------------------------------- the agent chat: a sheet */
+body.xp-phone.agent-view #agent-chat {
+    left: 0; right: 0; top: auto; bottom: 0; width: auto; max-width: none;
+    height: min(66dvh, 580px); border-radius: 18px 18px 0 0; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom); background: var(--xp-card); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35); font-size: 14px;
+}
+body.xp-phone.agent-view #agent-chat.folded { top: auto; bottom: 0; height: auto; }
+body.xp-phone .xp-sheet-handle { display: flex; justify-content: center; padding-top: 8px; }
+body.xp-phone .xp-sheet-handle span { width: 36px; height: 4px; border-radius: 999px; background: var(--xp-line); }
+body.xp-phone #agent-chat .agent-chat-head { gap: 12px; padding: 4px 8px 10px 16px; cursor: pointer; }
+body.xp-phone #agent-chat.folded .agent-chat-head { padding-bottom: 14px; }
+body.xp-phone #agent-chat.folded .xp-chat-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--xp-accent-soft); color: var(--xp-accent-text); }
+body.xp-phone .xp-chat-titles { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+body.xp-phone .xp-chat-titles strong { font-size: 15px; }
+body.xp-phone .xp-chat-titles #agent-chat-state { flex: none; font-size: 13px; white-space: normal; }
+body.xp-phone #agent-chat-fold { width: 44px; height: 44px; display: grid; place-items: center; color: var(--text-color); }
+body.xp-phone #agent-chat-log { padding: 14px 16px; gap: 10px; }
+body.xp-phone #agent-chat-log li { padding: 9px 12px; font-size: 14px; }
+body.xp-phone #agent-chat-log li.from-user { border-radius: 14px 14px 4px 14px; background: var(--xp-accent-soft); }
+body.xp-phone #agent-chat-log li.from-agent { border-radius: 14px 14px 14px 4px; background: var(--xp-field); }
+body.xp-phone .agent-chat-compose { padding: 10px 12px 16px; gap: 8px; }
+body.xp-phone .xp-field-label { display: block; font-size: 12px; color: var(--text-secondary); margin: 2px 0 -4px; }
+body.xp-phone #xp-chat-desc, body.xp-phone #agent-chat-text { background: var(--xp-field); border-radius: 10px; font-size: 14px; padding: 10px 12px; resize: none; }
+body.xp-phone #xp-chat-desc { min-height: 42px; }
+body.xp-phone #agent-chat-text { min-height: 64px; }
+body.xp-phone .agent-chat-row { gap: 8px; }
+body.xp-phone #agent-chat-attach { width: 44px; height: 44px; border-radius: 12px; background: var(--xp-field); }
+body.xp-phone #agent-chat-model { height: 44px; padding: 0 10px; border-radius: 12px; background: var(--xp-field); font-size: 14px; margin-left: auto; }
+body.xp-phone #agent-chat-send { height: 44px; padding: 0 20px; border-radius: 12px; font-size: 15px; }
+
+/* ------------------------------------------------------- the sync popup: a card at the bottom */
+body.xp-phone .xp-pop { place-items: end center; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+body.xp-phone .xp-pop-card { width: 100%; padding: 20px; border-radius: 20px; }
+body.xp-phone .xp-pop-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--xp-accent-soft); color: var(--xp-accent-text); }
+body.xp-phone .xp-pop-actions .home-btn { min-height: 44px; }
