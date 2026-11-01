@@ -30,8 +30,9 @@ const swap = (from, to) => {
 };
 swap(/<html lang="en">/, '<html lang="en" data-edition="portable">');
 swap(/<title>[^<]*<\/title>/, '<title>CanvasXP</title>');
-swap(/(<link rel="stylesheet" href="style\.css\?v=[^"]*">)/, `$1\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
-swap(/(<script src="script\.js\?v=[^"]*"><\/script>)/, `$1\n    <script src="xp.js?v=${version}"></script>`);
+// Every build is a new address for CanvasX's own files too, so a phone never keeps an old copy.
+swap(/<link rel="stylesheet" href="style\.css\?v=[^"]*">/, `<link rel="stylesheet" href="style.css?v=${version}">\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
+swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
 swap(/<h1>CanvasX<\/h1>/, '<h1>CanvasXP</h1>');
 fs.writeFileSync(path.join(SITE, 'index.html'), html);
 console.log(`CanvasXP built in ${path.relative(process.cwd(), SITE) || SITE} (version ${version}).`);
