@@ -14,11 +14,11 @@
  *                  is taken in only once every file's hash checks, so a
  *                  cable pulled mid-copy changes nothing;
  *   chats/         each agent canvas's conversation, as NoteX last sent it;
- *   outbox/<id>/   a message to the agent written here while away from the
- *                  PC: files/, then message.json. NoteX answers it at the
- *                  next sync (t-3e75a404cf; NoteX t-e4196083e7);
  *   status/        NoteX's steps while it syncs, shown in a popup
  *                  (t-8cbbaa2aad; NoteX t-2ff7b152e9).
+ * and, where the user can read them, Queued messages/: each message to the
+ * agent written here while away from the PC, answered at the next sync
+ * (t-0b4e61bf2b).
  * NoteX never replaces or deletes anything here; this page does, because
  * over File transfer Windows asks before either.
  */
@@ -197,16 +197,21 @@
         };
         const xp = await xpDir(true);
         for (const op of ops) {
-            // The outbox: what the agent answered goes; what NoteX could not hand it keeps the reason.
-            if (op.op === 'answered') {
+            // Queued messages: what the agent answered goes; what NoteX could not hand it keeps the
+            // reason beside it. Only the message NoteX named - a folder of that name now holding
+            // another message is left alone.
+            if (op.op === 'answered' || op.op === 'unanswered') {
                 let box = null;
-                try { box = await xp.getDirectoryHandle('outbox'); } catch { continue; }
-                for (const id of op.ids || []) if (safeSeg(id)) { try { await box.removeEntry(id, { recursive: true }); } catch { /* already gone */ } }
-                continue;
-            }
-            if (op.op === 'unanswered') {
-                if (!safeSeg(op.id)) continue;
-                try { await writeJson(await dirAt(xp, ['outbox', op.id]), 'error.json', { error: String(op.error || 'Not answered.'), at: new Date().toISOString() }); } catch { /* removed here meanwhile */ }
+                try { box = await targetWorkspaceHandle.getDirectoryHandle(QUEUE); } catch { continue; }
+                for (const it of op.op === 'answered' ? op.items || [] : [op]) {
+                    if (!safeSeg(it.dir)) continue;
+                    let d;
+                    try { d = await box.getDirectoryHandle(it.dir); } catch { continue; }
+                    const q = parseQueued(await readText(d, MESSAGE));
+                    if (!q || q.meta.id !== it.id) continue;
+                    if (op.op === 'answered') { try { await box.removeEntry(it.dir, { recursive: true }); } catch { /* already gone */ } }
+                    else await writeBlob(d, NOT_ANSWERED, String(op.error || 'Not answered.'));
+                }
                 continue;
             }
             if (!safeCanvas(op.canvas)) continue;
@@ -298,10 +303,17 @@
     /* ------------------------------------- the agent chat, queued for the PC */
 
     /* On an agent canvas the chat shows the conversation NoteX last sent and,
-     * after it, the messages waiting for the PC. Send keeps the message in
-     * the outbox - its files first, message.json last, so NoteX never takes
-     * half a message - and NoteX answers it at the next USB sync
-     * (t-3e75a404cf; NoteX t-e4196083e7, t-957b09f2fe). */
+     * after it, the messages waiting for the PC (t-3e75a404cf). Each is kept
+     * where the user can read it (t-0b4e61bf2b): Queued messages/<canvas> -
+     * <date time>/ in the target folder, its attachments first and message.md
+     * last - canvas, Description, Prompt, the attachments, and a closing
+     * comment with its id and each file's hash - so NoteX never takes half a
+     * message. NoteX answers it at the next USB sync (NoteX t-e4196083e7,
+     * t-957b09f2fe), and reads the words from the headings, so an edit to
+     * message.md before then counts. */
+    const QUEUE = 'Queued messages';
+    const MESSAGE = 'message.md';
+    const NOT_ANSWERED = 'Not answered.txt';
     const MAX_TEXT = 4000;
     const MODELS = ['sonnet', 'opus', 'haiku'];
     let syncing = null; // NoteX's latest step while a sync runs
@@ -311,23 +323,58 @@
         try { return await readJson(await dir.getDirectoryHandle('chats'), `${name}.json`); } catch { return null; }
     }
 
+    async function readText(dir, name) {
+        try { return await (await (await dir.getFileHandle(name)).getFile()).text(); } catch { return null; }
+    }
+
+    // message.md: headings to read, and the comment NoteX needs (as NoteX's parseQueued reads it).
+    function parseQueued(md) {
+        const m = /<!--\s*CanvasXP\s+(\{[\s\S]*?\})\s*-->/.exec(String(md || ''));
+        if (!m) return null;
+        let meta;
+        try { meta = JSON.parse(m[1]); } catch { return null; }
+        const body = String(md).slice(0, m.index);
+        const section = (h) => {
+            const s = new RegExp(`^##\\s+${h}\\s*$([\\s\\S]*?)(?=^##\\s|$(?![\\s\\S]))`, 'm').exec(body);
+            const t = s ? s[1].trim() : '';
+            return t === '(none)' ? '' : t;
+        };
+        return { meta, description: section('Description'), prompt: section('Prompt') };
+    }
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const stampOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}`;
+
+    function messageMd({ id, canvas, model, at, description, prompt, files }) {
+        const d = new Date(at);
+        return [
+            '# Queued message', '',
+            `Canvas: ${canvas}`,
+            `Queued: ${stampOf(d).replace('.', ':')}`,
+            `Model: ${MODEL_NAMES[model] || model || 'Sonnet'}`, '',
+            '## Description', '', description || '(none)', '',
+            '## Prompt', '', prompt || '(none)', '',
+            '## Attachments', '', files.length ? files.map((f) => `- ${f.name}`).join('\n') : '(none)', '',
+            `<!-- CanvasXP ${JSON.stringify({ id, canvas, model, at, files })} -->`, '',
+        ].join('\n');
+    }
+
     // The messages waiting for the PC - for one canvas, or all - oldest first.
     async function queued(name = null) {
-        const dir = await xpDir();
         let box;
-        try { box = await dir.getDirectoryHandle('outbox'); } catch { return []; }
+        try { box = await targetWorkspaceHandle.getDirectoryHandle(QUEUE); } catch { return []; }
         const out = [];
         for await (const e of box.values()) {
             if (e.kind !== 'directory') continue;
-            const m = await readJson(e, 'message.json');
-            if (!m || (name && m.canvas !== name)) continue;
-            const err = await readJson(e, 'error.json');
-            out.push({ ...m, id: e.name, error: err && err.error });
+            const q = parseQueued(await readText(e, MESSAGE));
+            if (!q || (name && q.meta.canvas !== name)) continue;
+            const err = await readText(e, NOT_ANSWERED);
+            out.push({ ...q.meta, dir: e.name, description: q.description, prompt: q.prompt, files: Array.isArray(q.meta.files) ? q.meta.files : [], error: err && err.trim() });
         }
-        return out.sort((a, b) => a.id.localeCompare(b.id));
+        return out.sort((a, b) => String(a.at).localeCompare(String(b.at)) || a.dir.localeCompare(b.dir));
     }
 
-    // A name NoteX can keep on Windows, not taken by another file of the message.
+    // A name NoteX can keep on Windows, not taken by another file of the message nor by message.md.
     function fileName(name, used) {
         let base = String(name || 'image').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(0, 120) || 'file';
         const dot = base.lastIndexOf('.');
@@ -336,6 +383,25 @@
         used.add(base.toLowerCase());
         return base;
     }
+
+    // A folder of its own in Queued messages: "<canvas> - <date time>", "(2)" when taken.
+    async function newQueueDir(canvas, at) {
+        const box = await targetWorkspaceHandle.getDirectoryHandle(QUEUE, { create: true });
+        const base = `${canvas} - ${stampOf(at)}`;
+        for (let i = 1; ; i++) {
+            const name = i === 1 ? base : `${base} (${i})`;
+            try { await box.getDirectoryHandle(name); } catch { return box.getDirectoryHandle(name, { create: true }); }
+        }
+    }
+
+    // The phone's chat has two boxes: the Description (what the attachments are) above the Prompt.
+    const descBox = document.createElement('textarea');
+    descBox.id = 'xp-chat-desc';
+    descBox.rows = 2;
+    descBox.placeholder = 'Description - what the attachments are (optional)';
+    const promptBox = document.getElementById('agent-chat-text');
+    promptBox.parentNode.insertBefore(descBox, promptBox);
+    promptBox.placeholder = 'Prompt - what the agent should do. It waits here and is answered at the next sync with the PC.';
 
     async function refreshPhoneChat() {
         const name = currentFabricName;
@@ -350,7 +416,7 @@
         const empty = log.querySelector('.agent-chat-empty');
         if (empty) {
             if (waiting.length) empty.remove();
-            else empty.textContent = 'Write to the agent about this canvas, and attach images from your gallery. Your messages wait here, and the agent answers them the next time the phone syncs with the PC.';
+            else empty.textContent = 'Write to the agent about this canvas, and attach images from your gallery. Your messages are kept in the folder "Queued messages", and the agent answers them the next time the phone syncs with the PC.';
         }
         for (const m of waiting) {
             const answering = Boolean(syncing && syncing.current === m.id);
@@ -359,8 +425,15 @@
             const who = document.createElement('span');
             who.className = 'who';
             who.textContent = `You · ${answering ? 'the agent is answering…' : m.error ? 'not answered' : 'waiting for the PC'} · ${chatAgo(m.at)}`;
-            li.append(who, document.createTextNode(m.text || ''));
-            if (m.files && m.files.length) {
+            li.append(who);
+            if (m.description) {
+                const d = document.createElement('span');
+                d.className = 'xp-desc';
+                d.textContent = m.description;
+                li.append(d);
+            }
+            li.append(document.createTextNode(m.prompt || ''));
+            if (m.files.length) {
                 const att = document.createElement('span');
                 att.className = 'attached';
                 att.textContent = `Attached: ${m.files.map((f) => f.name).join(', ')}`;
@@ -378,8 +451,8 @@
                 off.textContent = 'Remove';
                 off.title = 'Take this message back before the PC sees it';
                 off.addEventListener('click', async () => {
-                    if (!confirm('Take this message back? The agent will not see it.')) return;
-                    try { await (await (await xpDir()).getDirectoryHandle('outbox')).removeEntry(m.id, { recursive: true }); } catch { /* already gone */ }
+                    if (!confirm('Take this message back? It is deleted from Queued messages, and the agent will not see it.')) return;
+                    try { await (await targetWorkspaceHandle.getDirectoryHandle(QUEUE)).removeEntry(m.dir, { recursive: true }); } catch { /* already gone */ }
                     refreshPhoneChat();
                 });
                 li.append(off);
@@ -396,30 +469,32 @@
     }
 
     async function sendPhoneChat() {
-        const textBox = document.getElementById('agent-chat-text');
-        const text = textBox.value.trim();
-        if ((!text && !chatFiles.length) || !agentCanvas) return;
-        if (text.length > MAX_TEXT) { setChatState(`A message can be at most ${MAX_TEXT} characters.`, true); return; }
+        const prompt = promptBox.value.trim();
+        const description = descBox.value.trim();
+        if ((!prompt && !description && !chatFiles.length) || !agentCanvas) return;
+        if (prompt.length + description.length > MAX_TEXT) { setChatState(`A message can be at most ${MAX_TEXT} characters.`, true); return; }
         const dir = await xpDir();
         if (!dir || !(await readJson(dir, 'device.json'))) { setChatState('Set up USB sync on the home screen first', true); return; }
         const btn = document.getElementById('agent-chat-send');
         btn.disabled = true;
         try {
-            const id = `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-            const msgDir = await dirAt(dir, ['outbox', id], true);
-            const filesDir = await msgDir.getDirectoryHandle('files', { create: true });
+            const at = new Date();
+            const id = `m-${at.getTime()}-${Math.random().toString(36).slice(2, 7)}`;
+            const canvas = currentFabricName;
+            const msgDir = await newQueueDir(canvas, at);
             const files = [];
-            const used = new Set();
+            const used = new Set([MESSAGE.toLowerCase(), NOT_ANSWERED.toLowerCase()]);
             for (const f of chatFiles) {
                 const name = fileName(f.name, used);
-                await writeBlob(filesDir, name, f);
+                await writeBlob(msgDir, name, f);
                 files.push({ name, size: f.size, sha: await sha256(f) });
             }
             const model = document.getElementById('agent-chat-model').value || null;
-            await writeJson(msgDir, 'message.json', { id, canvas: currentFabricName, text, model, at: new Date().toISOString(), files });
+            await writeBlob(msgDir, MESSAGE, messageMd({ id, canvas, model, at: at.toISOString(), description, prompt, files }));
             chatFiles = [];
             renderChatFiles();
-            textBox.value = '';
+            promptBox.value = '';
+            descBox.value = '';
         } catch (e) {
             setChatState(`Could not keep the message: ${e.message}`, true);
         }

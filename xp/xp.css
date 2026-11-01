@@ -58,3 +58,13 @@
 .xp-pop-actions [hidden] { display: none; }
 .xp-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg-solid); color: var(--text-color); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .xp-pill[hidden] { display: none; }
+
+/* The Description box above the Prompt, and a queued message's description */
+#xp-chat-desc {
+    width: 100%; resize: vertical; min-height: 38px; max-height: 140px; padding: 7px 10px; border-radius: 8px;
+    background: var(--bg-hover); color: var(--text-color); border: 1px solid var(--panel-border); font: inherit; outline: none;
+    user-select: text; -webkit-user-select: text;
+}
+#xp-chat-desc:focus { border-color: var(--accent); }
+#agent-chat.folded #xp-chat-desc { display: none; }
+#agent-chat-log .xp-desc { display: block; margin-bottom: 4px; padding-left: 8px; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); color: var(--text-secondary); font-style: italic; }

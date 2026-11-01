@@ -73,7 +73,7 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
 - **CanvasXP** is CanvasX for phones: the same app, built from the same files, that you host on Netlify and install from Chrome or Samsung Internet. It works on a target folder in the phone's own storage, like CanvasX on the PC.
 - **USB sync with the PC through NoteX.** Press **Set up USB sync** on CanvasXP's home screen, plug the phone in with **File transfer**, and pick the same folder in NoteX's **Phone** view. After that, **Phone attached - sync** in NoteX keeps the two the same, canvas by canvas. When both sides changed a canvas, both versions are kept: the PC's under its name, the phone's beside it as "Name (phone)".
 - CanvasXP keeps what the sync needs in `_canvasxp/` inside its folder. It lists every file with its SHA-256 after each save, and when its home screen shows it takes in what NoteX copied over, once every file's hash checks. If you changed a canvas on the phone after NoteX last saw it, your version is kept aside as "Name (phone)" before the PC's is written.
-- **Talk to the agent from the phone.** Agent canvases come to the phone view-only, with the chat beside them. What you write there, with photos from your gallery or other files attached, waits on the phone marked "waiting for the PC" (you can still remove it). At the next USB sync NoteX has the agent answer each message, and the redrawn canvas and the answers come back to the phone in the same sync.
+- **Talk to the agent from the phone.** Agent canvases come to the phone view-only, with the chat beside them, which has two boxes: **Description** (what the attachments are) and **Prompt** (what the agent should do). Send keeps the message in your target folder, in **Queued messages**, as a folder named `<canvas> - <date time>` holding the photos from your gallery or other files you attached and a readable `message.md` with the canvas, Description, Prompt and attachments. The chat shows it as "waiting for the PC", and you can still remove it. At the next USB sync NoteX has the agent answer each message, and the redrawn canvas and the answers come back to the phone in the same sync, while the answered folders are cleared. One NoteX could not hand to the agent keeps a `Not answered.txt` saying why.
 - **A popup while NoteX syncs.** When NoteX starts reading the phone, CanvasXP says NoteX is accessing your canvases. While the agent answers your waiting messages it shows a progress bar ("1 of 3 answered"), and once NoteX's changes are taken in it shows Synced, with what changed. **Hide** tucks it into a slim bar at the top. If NoteX goes quiet for a minute and a half, it says NoteX stopped. If you have an ordinary canvas open that the PC changed, it asks you to go to the home screen to bring the changes in, so your open copy is not saved over them.
 
 ---
@@ -89,7 +89,9 @@ The on-disk format (`fabric.json`, `.fabric_lock`) is unchanged, so NoteX and ex
     .fabric_lock     present while the canvas is open; refreshed every 10 s
     agent.json       present when the canvas is assigned to the agent
   _canvasxp/         on a phone, CanvasXP's USB sync: device.json, manifest.json, incoming/,
-                     outbox/ (messages to the agent), chats/, status/ (NoteX's steps)
+                     chats/, status/ (NoteX's steps)
+  Queued messages/   on a phone, messages to the agent waiting for the PC: <canvas> - <date time>/
+                     with message.md and the attachments
 ```
 
 Because it is plain JSON in plain folders, other programs can read it. **NoteX** reads it to build AI-searchable documents, and writes agents' scripts into it only when the lock has gone stale.
