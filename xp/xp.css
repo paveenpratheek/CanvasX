@@ -372,3 +372,13 @@ body.xp-side.agent-view:has(#agent-chat:not(.folded)) .xp-topbar { width: min(44
 /* ------------------------------------------------------------ the sync popup: a card in the middle */
 body.xp-tab .xp-pop { place-items: center; }
 body.xp-tab .xp-pop-card { width: min(460px, 100%); }
+
+/* =====================================================================================
+ * Opening a canvas (t-57764f6348): a card in the middle of the screen until it is drawn.
+ * ===================================================================================== */
+body .xp-pop.xp-open-pop { place-items: center; padding: 16px; background: rgba(2, 6, 23, 0.4); }
+body .xp-open-pop .xp-pop-card { width: min(380px, 100%); }
+.xp-open-pop .xp-pop-title { overflow-wrap: anywhere; }
+.xp-open-spin { flex: none; width: 28px; height: 28px; box-sizing: border-box; border-radius: 50%; border: 3px solid var(--xp-line); border-top-color: var(--accent); animation: xp-spin 0.9s linear infinite; }
+@keyframes xp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .xp-open-spin { animation-duration: 3s; } }

@@ -1060,6 +1060,45 @@
         scheduleManifest();
         return r;
     };
+    // Opening a canvas from the home screen (t-57764f6348): on a phone reading its pictures can take
+    // a while, so a card says at once that it is opening, then counts the pictures and PDFs as they
+    // load. A second tap meanwhile opens nothing more. Re-reading the canvas already open (NoteX's
+    // agent canvas, a batch taken in) shows no card.
+    const openPop = make('div', 'xp-pop xp-open-pop', '<div class="xp-pop-card" role="status" aria-live="polite"><div class="xp-pop-head"><span class="xp-open-spin" aria-hidden="true"></span><div class="xp-pop-titles"><span class="xp-pop-title"></span><span class="xp-pop-text"></span></div></div><div class="xp-pop-bar busy"><span></span></div></div>');
+    openPop.hidden = true;
+    document.body.append(openPop);
+    const openText = openPop.querySelector('.xp-pop-text');
+    const openBar = openPop.querySelector('.xp-pop-bar');
+    window.onFabricLoading = (done, total) => {
+        if (openPop.hidden || !total) return;
+        openText.textContent = `Loading pictures and PDFs: ${done} of ${total}`;
+        openBar.classList.remove('busy');
+        openBar.firstChild.style.width = `${Math.max(4, Math.round((done / total) * 100))}%`;
+    };
+    let opening = null;
+    const origOpen = openFabric;
+    openFabric = function (dirHandle, name) {
+        if (homeScreen.classList.contains('hidden')) return origOpen.apply(this, arguments);
+        if (opening) return opening;
+        const args = arguments;
+        openPop.querySelector('.xp-pop-title').textContent = `Opening ${name}`;
+        openText.textContent = 'Reading the canvas…';
+        openBar.classList.add('busy');
+        openBar.firstChild.style.width = '';
+        openPop.hidden = false;
+        opening = (async () => {
+            try {
+                // Drawn before the slow part starts (a hidden tab draws nothing, hence the timer too).
+                await new Promise((r) => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 150); });
+                return await origOpen.apply(this, args);
+            } finally {
+                openPop.hidden = true;
+                opening = null;
+            }
+        })();
+        return opening;
+    };
+
     // The grid is drawn again after a canvas is made, renamed or deleted.
     const origGrid = loadFabricsGrid;
     loadFabricsGrid = async function () {

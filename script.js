@@ -9311,6 +9311,11 @@ async function openFabric(dirHandle, name) {
         
         // REHYDRATE FILES
         if (actualData && actualData.files) {
+            // How many pictures and PDFs are in, for whoever set window.onFabricLoading (CanvasXP's loading card, t-2430327a34).
+            const media = actualData.files.filter(f => f.isImage || f.isPdf).length;
+            let mediaLoaded = 0;
+            const mediaProgress = () => { if (typeof window.onFabricLoading === 'function') window.onFabricLoading(mediaLoaded, media); };
+            mediaProgress();
             for (let f of actualData.files) {
                 if (f.isImage || f.isPdf) {
                     try {
@@ -9338,6 +9343,8 @@ async function openFabric(dirHandle, name) {
                     } catch (err) {
                         console.warn('Could not rehydrate media:', f.name);
                     }
+                    mediaLoaded++;
+                    mediaProgress();
                 }
             }
         }
