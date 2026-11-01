@@ -5249,7 +5249,11 @@ function generateTotemThumbnail(tx, ty) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = 400 * dpr;
     canvas.height = 250 * dpr;
-    
+    // Resizing a canvas resets its transform: the dpr scale goes back on for the thumbnail, and
+    // again after the size is restored, or a screen whose dpr is not 1 drew everything at 1/dpr
+    // from then on - the canvas "disoriented" after Mission Control on a phone (t-e70133b69e).
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     state.camera.x = -tx * 0.15;
     state.camera.y = -ty * 0.15;
     state.camera.zoom = 0.15;
@@ -5261,6 +5265,7 @@ function generateTotemThumbnail(tx, ty) {
     
     canvas.width = originalWidth;
     canvas.height = originalHeight;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     state.camera = originalCam;
     filesLayer.style.display = originalDisplay;
     render();
