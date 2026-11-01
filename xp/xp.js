@@ -9,9 +9,16 @@
  *   manifest.json  every file of every canvas with its SHA-256, refreshed
  *                  after each save - NoteX reads it to see what changed - and
  *                  the batches taken in;
- *   incoming/<id>/ what NoteX leaves: files/<canvas>/<path>, then
- *                  changes.json. A batch is taken in only once every file's
- *                  hash checks, so a cable pulled mid-copy changes nothing.
+ *   incoming/<id>/ what NoteX leaves: files/<canvas>/<path>, chats/ (an
+ *                  agent canvas's conversation), then changes.json. A batch
+ *                  is taken in only once every file's hash checks, so a
+ *                  cable pulled mid-copy changes nothing;
+ *   chats/         each agent canvas's conversation, as NoteX last sent it;
+ *   outbox/<id>/   a message to the agent written here while away from the
+ *                  PC: files/, then message.json. NoteX answers it at the
+ *                  next sync (t-3e75a404cf; NoteX t-e4196083e7);
+ *   status/        NoteX's steps while it syncs, shown in a popup
+ *                  (t-8cbbaa2aad; NoteX t-2ff7b152e9).
  * NoteX never replaces or deletes anything here; this page does, because
  * over File transfer Windows asks before either.
  */
@@ -26,9 +33,6 @@
     const safeRel = (r) => typeof r === 'string' && r.split('/').every(safeSeg);
     // Chrome writes through a .crswap file beside the real one; it is never a canvas's own.
     const skipFile = (name) => name === LOCK || name.endsWith('.crswap');
-
-    // No NoteX on the phone: talking to the agent happens on the PC.
-    startAgentChat = function () {};
 
     /* ------------------------------------------------------------ helpers */
 
@@ -145,6 +149,11 @@
                 if (!ch || !Array.isArray(ch.ops)) break;
                 let whole = true;
                 for (const op of ch.ops) {
+                    if (op.op === 'chat') {
+                        const f = safeCanvas(op.canvas) && (await fileAt(b, ['chats', `${op.canvas}.json`]));
+                        if (!f || (await sha256(f)) !== op.sha) { whole = false; break; }
+                        continue;
+                    }
                     if (op.op !== 'put') continue;
                     if (!safeCanvas(op.canvas) || !safeRel(op.path)) { whole = false; break; }
                     const f = await fileAt(b, ['files', op.canvas, ...op.path.split('/')]);
@@ -186,9 +195,25 @@
             await copyDir(await targetWorkspaceHandle.getDirectoryHandle(canvas), await targetWorkspaceHandle.getDirectoryHandle(to, { create: true }));
             aside.push({ name: canvas, copy: to });
         };
+        const xp = await xpDir(true);
         for (const op of ops) {
+            // The outbox: what the agent answered goes; what NoteX could not hand it keeps the reason.
+            if (op.op === 'answered') {
+                let box = null;
+                try { box = await xp.getDirectoryHandle('outbox'); } catch { continue; }
+                for (const id of op.ids || []) if (safeSeg(id)) { try { await box.removeEntry(id, { recursive: true }); } catch { /* already gone */ } }
+                continue;
+            }
+            if (op.op === 'unanswered') {
+                if (!safeSeg(op.id)) continue;
+                try { await writeJson(await dirAt(xp, ['outbox', op.id]), 'error.json', { error: String(op.error || 'Not answered.'), at: new Date().toISOString() }); } catch { /* removed here meanwhile */ }
+                continue;
+            }
             if (!safeCanvas(op.canvas)) continue;
-            if (op.op === 'copy') {
+            if (op.op === 'chat') {
+                const f = await fileAt(batch, ['chats', `${op.canvas}.json`]);
+                if (f) await writeBlob(await dirAt(xp, ['chats'], true), `${op.canvas}.json`, f);
+            } else if (op.op === 'copy') {
                 if (!safeCanvas(op.to) || !(await exists(op.canvas)) || (await exists(op.to))) continue;
                 checked.add(op.canvas); // NoteX already set the phone's version aside
                 await copyDir(await targetWorkspaceHandle.getDirectoryHandle(op.canvas), await targetWorkspaceHandle.getDirectoryHandle(op.to, { create: true }));
@@ -244,6 +269,8 @@
         const parts = [`This phone is "${dev.name}".`];
         parts.push(m.lastSync ? `Last synced with ${m.lastSync.from} on ${when(m.lastSync.at)}.` : `Not synced yet - plug the phone into the PC, pick File transfer, and in NoteX open Phone and choose the folder "${targetWorkspaceHandle.name}".`);
         if (waiting) parts.push(`${waiting} change${waiting === 1 ? '' : 's'} from the PC still copying.`);
+        const asks = (await queued()).length;
+        if (asks) parts.push(`${asks} message${asks === 1 ? '' : 's'} to the agent ${asks === 1 ? 'waits' : 'wait'} for the PC.`);
         if (note) parts.push(note);
         stateEl.textContent = parts.join(' ');
     }
@@ -268,11 +295,310 @@
         scheduleManifest(0);
     }
 
+    /* ------------------------------------- the agent chat, queued for the PC */
+
+    /* On an agent canvas the chat shows the conversation NoteX last sent and,
+     * after it, the messages waiting for the PC. Send keeps the message in
+     * the outbox - its files first, message.json last, so NoteX never takes
+     * half a message - and NoteX answers it at the next USB sync
+     * (t-3e75a404cf; NoteX t-e4196083e7, t-957b09f2fe). */
+    const MAX_TEXT = 4000;
+    const MODELS = ['sonnet', 'opus', 'haiku'];
+    let syncing = null; // NoteX's latest step while a sync runs
+
+    async function chatOf(name) {
+        const dir = await xpDir();
+        try { return await readJson(await dir.getDirectoryHandle('chats'), `${name}.json`); } catch { return null; }
+    }
+
+    // The messages waiting for the PC - for one canvas, or all - oldest first.
+    async function queued(name = null) {
+        const dir = await xpDir();
+        let box;
+        try { box = await dir.getDirectoryHandle('outbox'); } catch { return []; }
+        const out = [];
+        for await (const e of box.values()) {
+            if (e.kind !== 'directory') continue;
+            const m = await readJson(e, 'message.json');
+            if (!m || (name && m.canvas !== name)) continue;
+            const err = await readJson(e, 'error.json');
+            out.push({ ...m, id: e.name, error: err && err.error });
+        }
+        return out.sort((a, b) => a.id.localeCompare(b.id));
+    }
+
+    // A name NoteX can keep on Windows, not taken by another file of the message.
+    function fileName(name, used) {
+        let base = String(name || 'image').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/[. ]+$/, '').slice(0, 120) || 'file';
+        const dot = base.lastIndexOf('.');
+        const stem = dot > 0 ? base.slice(0, dot) : base, ext = dot > 0 ? base.slice(dot) : '';
+        for (let i = 2; used.has(base.toLowerCase()); i++) base = `${stem} (${i})${ext}`;
+        used.add(base.toLowerCase());
+        return base;
+    }
+
+    async function refreshPhoneChat() {
+        const name = currentFabricName;
+        if (!agentCanvas || !name || !targetWorkspaceHandle) return;
+        const dir = await xpDir();
+        const dev = dir && (await readJson(dir, 'device.json'));
+        const r = (dev && (await chatOf(name))) || { name, chat: [], model: 'sonnet', models: MODELS };
+        const waiting = dev ? await queued(name) : [];
+        if (name !== currentFabricName || !agentCanvas) return;
+        renderAgentChat({ ...r, models: r.models || MODELS, ask: null });
+        const log = document.getElementById('agent-chat-log');
+        const empty = log.querySelector('.agent-chat-empty');
+        if (empty) {
+            if (waiting.length) empty.remove();
+            else empty.textContent = 'Write to the agent about this canvas, and attach images from your gallery. Your messages wait here, and the agent answers them the next time the phone syncs with the PC.';
+        }
+        for (const m of waiting) {
+            const answering = Boolean(syncing && syncing.current === m.id);
+            const li = document.createElement('li');
+            li.className = `from-user queued${m.error && !answering ? ' bad' : ''}`;
+            const who = document.createElement('span');
+            who.className = 'who';
+            who.textContent = `You · ${answering ? 'the agent is answering…' : m.error ? 'not answered' : 'waiting for the PC'} · ${chatAgo(m.at)}`;
+            li.append(who, document.createTextNode(m.text || ''));
+            if (m.files && m.files.length) {
+                const att = document.createElement('span');
+                att.className = 'attached';
+                att.textContent = `Attached: ${m.files.map((f) => f.name).join(', ')}`;
+                li.append(att);
+            }
+            if (m.error && !answering) {
+                const er = document.createElement('span');
+                er.className = 'attached';
+                er.textContent = `${m.error} It is tried again at the next sync.`;
+                li.append(er);
+            }
+            if (!syncing) {
+                const off = document.createElement('button');
+                off.className = 'xp-unqueue';
+                off.textContent = 'Remove';
+                off.title = 'Take this message back before the PC sees it';
+                off.addEventListener('click', async () => {
+                    if (!confirm('Take this message back? The agent will not see it.')) return;
+                    try { await (await (await xpDir()).getDirectoryHandle('outbox')).removeEntry(m.id, { recursive: true }); } catch { /* already gone */ }
+                    refreshPhoneChat();
+                });
+                li.append(off);
+            }
+            log.append(li);
+        }
+        const count = `${r.chat ? r.chat.length : 0}+${waiting.length}`;
+        if (log.dataset.xpCount !== count) log.scrollTop = log.scrollHeight;
+        log.dataset.xpCount = count;
+        document.getElementById('agent-chat-send').disabled = !dev;
+        if (!dev) setChatState('Set up USB sync on the home screen first', true);
+        else if (syncing) setChatState('syncing with the PC');
+        else setChatState(waiting.length ? `${waiting.length} waiting for the PC` : '');
+    }
+
+    async function sendPhoneChat() {
+        const textBox = document.getElementById('agent-chat-text');
+        const text = textBox.value.trim();
+        if ((!text && !chatFiles.length) || !agentCanvas) return;
+        if (text.length > MAX_TEXT) { setChatState(`A message can be at most ${MAX_TEXT} characters.`, true); return; }
+        const dir = await xpDir();
+        if (!dir || !(await readJson(dir, 'device.json'))) { setChatState('Set up USB sync on the home screen first', true); return; }
+        const btn = document.getElementById('agent-chat-send');
+        btn.disabled = true;
+        try {
+            const id = `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const msgDir = await dirAt(dir, ['outbox', id], true);
+            const filesDir = await msgDir.getDirectoryHandle('files', { create: true });
+            const files = [];
+            const used = new Set();
+            for (const f of chatFiles) {
+                const name = fileName(f.name, used);
+                await writeBlob(filesDir, name, f);
+                files.push({ name, size: f.size, sha: await sha256(f) });
+            }
+            const model = document.getElementById('agent-chat-model').value || null;
+            await writeJson(msgDir, 'message.json', { id, canvas: currentFabricName, text, model, at: new Date().toISOString(), files });
+            chatFiles = [];
+            renderChatFiles();
+            textBox.value = '';
+        } catch (e) {
+            setChatState(`Could not keep the message: ${e.message}`, true);
+        }
+        btn.disabled = false;
+        await refreshPhoneChat();
+    }
+
+    startAgentChat = function () {
+        stopAgentChat();
+        const log = document.getElementById('agent-chat-log');
+        log.replaceChildren();
+        log.dataset.count = '';
+        log.dataset.xpCount = '';
+        setChatState('');
+        refreshPhoneChat();
+        chatTimer = setInterval(refreshPhoneChat, 3000);
+    };
+    refreshAgentChat = refreshPhoneChat;
+    sendAgentChat = sendPhoneChat; // Enter in the chat
+    {
+        // Send was bound to CanvasX's own send, which talks to NoteX over the network.
+        const old = document.getElementById('agent-chat-send');
+        const btn = old.cloneNode(true);
+        old.replaceWith(btn);
+        btn.addEventListener('click', () => sendPhoneChat());
+    }
+
+    /* --------------------------------------------- NoteX at work: the popup */
+
+    /* While NoteX syncs it leaves a new status file at each step (NoteX
+     * t-2ff7b152e9). A new one shows the popup: NoteX is accessing the
+     * canvases, a progress bar while the agent answers the queued messages,
+     * then Synced once the batch is taken in (t-8cbbaa2aad). Whether NoteX
+     * stopped is judged by when a new file last appeared, on this phone's
+     * own clock. */
+    const POLL_MS = 2000;
+    const STALE_MS = 90000;
+    const pop = document.createElement('div');
+    pop.id = 'xp-pop';
+    pop.className = 'xp-pop';
+    pop.hidden = true;
+    pop.innerHTML = '<div class="xp-pop-card" role="status" aria-live="polite"><div class="xp-pop-title"></div><div class="xp-pop-text"></div><div class="xp-pop-bar"><span></span></div><div class="xp-pop-count"></div><div class="xp-pop-actions"><button class="home-btn xp-pop-home" hidden>Go to the home screen</button><button class="home-btn xp-pop-close">Hide</button></div></div>';
+    const pill = document.createElement('button');
+    pill.id = 'xp-pill';
+    pill.className = 'xp-pill';
+    pill.hidden = true;
+    document.body.append(pop, pill);
+    const q = (sel) => pop.querySelector(sel);
+
+    let started = false, lastName = null, lastAt = 0, current = null, tucked = false, closeTimer = null, view = null, finishing = false;
+
+    function render(v) {
+        view = v;
+        q('.xp-pop-title').textContent = v.title;
+        q('.xp-pop-text').textContent = v.text || '';
+        q('.xp-pop-count').textContent = v.count || '';
+        const bar = q('.xp-pop-bar');
+        bar.hidden = v.bar === undefined;
+        bar.classList.toggle('busy', v.bar === 'busy');
+        bar.firstElementChild.style.width = typeof v.bar === 'number' ? `${Math.max(3, Math.round(v.bar * 100))}%` : '';
+        pop.classList.toggle('ok', Boolean(v.ok));
+        pop.classList.toggle('bad', Boolean(v.bad));
+        q('.xp-pop-home').hidden = !v.home;
+        q('.xp-pop-close').textContent = v.final ? 'OK' : 'Hide';
+        const showPill = tucked && !v.final;
+        pop.hidden = showPill;
+        pill.hidden = !showPill;
+        pill.textContent = `${v.title}${v.count ? ` · ${v.count}` : ''}`;
+        clearTimeout(closeTimer);
+        if (v.ok && !v.home) closeTimer = setTimeout(closePop, 6000);
+    }
+    function closePop() {
+        clearTimeout(closeTimer);
+        pop.hidden = true;
+        pill.hidden = true;
+        view = null;
+    }
+    q('.xp-pop-close').addEventListener('click', () => {
+        if (!view || view.final) { closePop(); return; }
+        tucked = true;
+        render(view);
+    });
+    q('.xp-pop-home').addEventListener('click', () => { closePop(); document.getElementById('btn-home').click(); });
+    pill.addEventListener('click', () => { tucked = false; if (view) render(view); });
+
+    function showStep(st) {
+        if (!current || current.sync !== st.sync) { tucked = false; finishing = false; }
+        current = st;
+        syncing = st.stage === 'done' || st.stage === 'failed' ? null : st;
+        if (agentCanvas) refreshPhoneChat();
+        if (st.stage === 'done') { finish(st); return; }
+        if (st.stage === 'failed') { render({ title: 'The sync stopped', text: st.text, final: true, bad: true }); return; }
+        if (st.stage === 'agent') {
+            render({ title: 'The agent is answering your messages', text: `${st.canvas ? `On "${st.canvas}". ` : ''}Keep the phone plugged in.`, bar: st.total ? st.done / st.total : 'busy', count: `${st.done} of ${st.total} answered` });
+            return;
+        }
+        render({ title: 'NoteX is accessing your canvases', text: `${st.text || ''}. Keep the phone plugged in.`.replace(/^\. /, ''), bar: 'busy' });
+    }
+
+    // The batches still waiting: does one change the canvas open here (an ordinary one, which
+    // CanvasX would save its open copy over)?
+    async function touchesOpenCanvas() {
+        if (homeScreen && !homeScreen.classList.contains('hidden')) return false;
+        if (!currentFabricName || agentCanvas) return false; // an agent canvas redraws from fabric.json by itself
+        const inc = await dirAt(await xpDir(), ['incoming']).catch(() => null);
+        if (!inc) return false;
+        for (const id of await waitingBatches()) {
+            const ch = await readJson(await inc.getDirectoryHandle(id), 'changes.json');
+            if (ch && Array.isArray(ch.ops) && ch.ops.some((o) => o.canvas === currentFabricName || o.to === currentFabricName)) return true;
+        }
+        return false;
+    }
+
+    // Done: take the batch in at once - it may still be appearing - then say Synced.
+    async function finish(st) {
+        if (finishing) return;
+        finishing = true;
+        render({ title: 'Synced - bringing in the changes', text: st.text, bar: 'busy' });
+        for (let i = 0; i < 30 && current === st; i++) {
+            if (await touchesOpenCanvas()) {
+                render({ title: 'Synced', text: `${st.text}. Go to the home screen to bring the PC's changes into "${currentFabricName}".`, bar: 1, ok: true, final: true, home: true });
+                return;
+            }
+            const r = await serial(takeIn);
+            const m = (await readJson(await xpDir(), 'manifest.json')) || {};
+            if (r.taken || (m.applied || []).includes(st.batch)) {
+                if (r.taken && homeScreen && !homeScreen.classList.contains('hidden')) { await loadFabricsGrid(); await showState(); }
+                if (agentCanvas) refreshPhoneChat();
+                const aside = r.aside.length ? ` Your own changes were kept beside the PC's: ${r.aside.map((a) => `"${a.copy}"`).join(', ')}.` : '';
+                render({ title: 'Synced', text: `${st.text}.${aside}`, bar: 1, ok: true, final: true });
+                return;
+            }
+            await new Promise((res) => setTimeout(res, POLL_MS));
+        }
+        if (current === st) render({ title: 'Synced', text: `${st.text}. The PC's changes are still copying - they come in from the home screen.`, bar: 1, ok: true, final: true });
+    }
+
+    async function pollStatus() {
+        if (!targetWorkspaceHandle || document.hidden) return;
+        const dir = await xpDir();
+        if (!dir) { if (!started) { started = true; lastName = null; lastAt = Date.now(); } return; } // nothing from NoteX yet
+        let sd = null;
+        try { sd = await dir.getDirectoryHandle('status'); } catch { /* NoteX has not synced here yet */ }
+        const names = [];
+        if (sd) for await (const e of sd.values()) if (e.kind === 'file' && /^s-[^/]*\.json$/.test(e.name)) names.push(e.name);
+        names.sort();
+        const latest = names[names.length - 1] || null;
+        for (const n of names.slice(0, -1)) { try { await sd.removeEntry(n); } catch { /* NoteX may be copying */ } }
+        if (!started) { started = true; lastName = latest; lastAt = Date.now(); return; } // left before this page opened
+        if (latest && latest !== lastName) {
+            lastName = latest;
+            lastAt = Date.now();
+            const st = await readJson(sd, latest);
+            if (st && st.stage) showStep(st);
+            return;
+        }
+        if (syncing && Date.now() - lastAt > STALE_MS) {
+            syncing = null;
+            current = null;
+            if (agentCanvas) refreshPhoneChat();
+            render({ title: 'NoteX stopped', text: 'No word from NoteX for a minute and a half - the cable may have come out. Plug the phone in and sync again in NoteX.', final: true, bad: true });
+        }
+    }
+    let polling = false;
+    async function tick() {
+        if (polling) return;
+        polling = true;
+        try { await pollStatus(); } catch (e) { console.warn('CanvasXP: reading NoteX\'s status failed', e); } finally { polling = false; }
+    }
+    setInterval(tick, POLL_MS);
+    // A phone asleep runs no timers: waking is not NoteX going quiet.
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) lastAt = Date.now(); });
+
     /* ------------------------------------------------- wrapping CanvasX */
 
     const origInit = initializeWorkspace;
     initializeWorkspace = async function () {
         await origInit.apply(this, arguments);
+        await tick(); // what NoteX left before the folder was opened is not news
         await onHome();
     };
     const origWrite = writeFabric;

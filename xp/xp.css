@@ -1,7 +1,6 @@
-/* CanvasXP only (t-66914c8b0f): the USB sync panel on the home screen, no
- * agent chat - the agent is talked to on the PC - and a home screen that
- * fits a phone. */
-#agent-chat { display: none !important; }
+/* CanvasXP only (t-66914c8b0f): the USB sync panel on the home screen, the
+ * agent chat whose messages wait for the PC (t-3e75a404cf), the popup while
+ * NoteX syncs (t-8cbbaa2aad), and a home screen that fits a phone. */
 
 .xp-sync {
     display: flex;
@@ -26,3 +25,36 @@
     .workspace-header { flex-wrap: wrap; gap: 12px; }
     #workspace-path-label { font-size: 18px; overflow-wrap: anywhere; }
 }
+
+/* Messages waiting for the PC, in the agent chat */
+#agent-chat-log li.queued { background: none; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+#agent-chat-log li.queued.bad { border-color: #ef4444; color: inherit; }
+#agent-chat-log li.queued.bad .attached:last-of-type { color: #ef4444; }
+.xp-unqueue { display: block; margin: 6px 0 0 auto; padding: 3px 10px; border-radius: 7px; border: 1px solid var(--panel-border); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.xp-unqueue:hover { color: var(--text-color); border-color: var(--accent); }
+
+@media (max-width: 640px) {
+    body.agent-view #agent-chat { left: 8px; right: 8px; width: auto; max-width: none; top: auto; bottom: 8px; height: min(58vh, 520px); }
+    body.agent-view #agent-chat.folded { height: auto; }
+}
+
+/* NoteX at work: the popup, and the slim bar it hides to */
+.xp-pop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, 0.55); }
+.xp-pop[hidden] { display: none; }
+.xp-pop-card { width: min(420px, 100%); padding: 20px; border-radius: 16px; background: var(--panel-bg-solid); color: var(--text-color); border: 1px solid var(--panel-border); box-shadow: var(--shadow-pop); }
+.xp-pop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.xp-pop.ok .xp-pop-title::before { content: '\2713'; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 13px; vertical-align: 2px; }
+.xp-pop.bad .xp-pop-title { color: #ef4444; }
+.xp-pop-text { font-size: 14px; line-height: 1.45; color: var(--text-secondary); overflow-wrap: anywhere; }
+.xp-pop-bar { position: relative; height: 8px; margin: 16px 0 6px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.xp-pop-bar[hidden] { display: none; }
+.xp-pop-bar span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
+.xp-pop.ok .xp-pop-bar span { background: #16a34a; }
+.xp-pop-bar.busy span { width: 35%; animation: xp-busy 1.3s ease-in-out infinite; }
+@keyframes xp-busy { from { left: -35%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .xp-pop-bar.busy span { animation: none; width: 100%; opacity: 0.5; } }
+.xp-pop-count { font-size: 13px; color: var(--text-secondary); min-height: 1em; }
+.xp-pop-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.xp-pop-actions [hidden] { display: none; }
+.xp-pill { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10000; max-width: calc(100vw - 32px); padding: 7px 14px; border-radius: 999px; border: 1px solid var(--panel-border); background: var(--panel-bg-solid); color: var(--text-color); box-shadow: var(--shadow-pop); font: inherit; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.xp-pill[hidden] { display: none; }
