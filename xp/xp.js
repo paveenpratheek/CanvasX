@@ -131,12 +131,15 @@
 
     /* Every batch NoteX left, oldest first. One still being copied - no
      * changes.json yet, or a file not whole - stops the rest, which may
-     * build on it. */
-    async function takeIn() {
+     * build on it; waiting then names what it waits for, and progress(text)
+     * hears how far it has got (t-bae0747ece). */
+    const noProgress = () => {};
+    async function takeIn(progress = noProgress) {
         const dir = await xpDir();
         if (!dir) return { taken: 0, aside: [] };
         const ids = await waitingBatches();
         if (!ids.length) return { taken: 0, aside: [] };
+        let waiting = null;
         const inc = await dir.getDirectoryHandle('incoming');
         const manifest = (await readJson(dir, 'manifest.json')) || {};
         manifest.applied = manifest.applied || [];
@@ -146,21 +149,25 @@
             if (!manifest.applied.includes(id)) {
                 const b = await inc.getDirectoryHandle(id);
                 const ch = await readJson(b, 'changes.json');
-                if (!ch || !Array.isArray(ch.ops)) break;
-                let whole = true;
+                if (!ch || !Array.isArray(ch.ops)) { waiting = 'the list of changes (changes.json) still copying'; break; }
+                const puts = ch.ops.filter((o) => o.op === 'put').length;
+                let checked = 0;
                 for (const op of ch.ops) {
                     if (op.op === 'chat') {
                         const f = safeCanvas(op.canvas) && (await fileAt(b, ['chats', `${op.canvas}.json`]));
-                        if (!f || (await sha256(f)) !== op.sha) { whole = false; break; }
+                        if (!f) { waiting = `"${op.canvas}"'s chat still copying`; break; }
+                        if ((await sha256(f)) !== op.sha) { waiting = `"${op.canvas}"'s chat not yet what NoteX sent`; break; }
                         continue;
                     }
                     if (op.op !== 'put') continue;
-                    if (!safeCanvas(op.canvas) || !safeRel(op.path)) { whole = false; break; }
+                    if (!safeCanvas(op.canvas) || !safeRel(op.path)) { waiting = `a file CanvasXP cannot name: ${op.canvas}/${op.path}`; break; }
                     const f = await fileAt(b, ['files', op.canvas, ...op.path.split('/')]);
-                    if (!f || (await sha256(f)) !== op.sha) { whole = false; break; }
+                    if (!f) { waiting = `${op.canvas}/${op.path} still copying`; break; }
+                    if ((await sha256(f)) !== op.sha) { waiting = `${op.canvas}/${op.path} not yet what NoteX sent`; break; }
+                    if (++checked % 10 === 0) progress(`Checking the PC's changes: ${checked} of ${puts} files`);
                 }
-                if (!whole) break;
-                aside.push(...(await applyOps(b, ch.ops)));
+                if (waiting) break;
+                aside.push(...(await applyOps(b, ch.ops, progress)));
                 manifest.applied = [...manifest.applied, id].slice(-KEEP_APPLIED);
                 manifest.lastSync = { at: ch.at || new Date().toISOString(), from: ch.from || 'the PC' };
                 if (aside.length) manifest.keptAside = [...(manifest.keptAside || []), ...aside].slice(-20);
@@ -170,13 +177,13 @@
             try { await inc.removeEntry(id, { recursive: true }); } catch (e) { console.warn('Could not remove batch', id, e); }
         }
         if (taken) await refreshManifest();
-        return { taken, aside };
+        return { taken, aside, waiting };
     }
 
     /* One batch's changes. A canvas changed here since NoteX last saw it -
      * a file not what NoteX thought - is copied aside as "Name (phone)"
      * before the PC's version is written, so nothing made here is lost. */
-    async function applyOps(batch, ops) {
+    async function applyOps(batch, ops, progress = noProgress) {
         const aside = [];
         const checked = new Set();
         const keepAside = async (canvas) => {
@@ -196,13 +203,26 @@
             aside.push({ name: canvas, copy: to });
         };
         const xp = await xpDir(true);
+        const total = ops.filter((o) => o.op === 'put').length;
+        let done = 0;
         for (const op of ops) {
+            try { await one(op); } catch (e) {
+                // Which file it was, in the browser's own words (t-bae0747ece).
+                const err = new Error(`${[op.canvas, op.path].filter(Boolean).join('/') || op.op}: ${e && e.name ? `${e.name} - ${e.message}` : e}`);
+                err.name = 'TakeInError';
+                throw err;
+            }
+            if (op.op === 'put' && ++done % 5 === 0) progress(`Bringing in the PC's changes: ${done} of ${total} files`);
+        }
+        return aside;
+
+        async function one(op) {
             // Queued messages: what the agent answered goes; what NoteX could not hand it keeps the
             // reason beside it. Only the message NoteX named - a folder of that name now holding
             // another message is left alone.
             if (op.op === 'answered' || op.op === 'unanswered') {
                 let box = null;
-                try { box = await targetWorkspaceHandle.getDirectoryHandle(QUEUE); } catch { continue; }
+                try { box = await targetWorkspaceHandle.getDirectoryHandle(QUEUE); } catch { return; }
                 for (const it of op.op === 'answered' ? op.items || [] : [op]) {
                     if (!safeSeg(it.dir)) continue;
                     let d;
@@ -212,31 +232,31 @@
                     if (op.op === 'answered') { try { await box.removeEntry(it.dir, { recursive: true }); } catch { /* already gone */ } }
                     else await writeBlob(d, NOT_ANSWERED, String(op.error || 'Not answered.'));
                 }
-                continue;
+                return;
             }
-            if (!safeCanvas(op.canvas)) continue;
+            if (!safeCanvas(op.canvas)) return;
             if (op.op === 'chat') {
                 const f = await fileAt(batch, ['chats', `${op.canvas}.json`]);
                 if (f) await writeBlob(await dirAt(xp, ['chats'], true), `${op.canvas}.json`, f);
             } else if (op.op === 'copy') {
-                if (!safeCanvas(op.to) || !(await exists(op.canvas)) || (await exists(op.to))) continue;
+                if (!safeCanvas(op.to) || !(await exists(op.canvas)) || (await exists(op.to))) return;
                 checked.add(op.canvas); // NoteX already set the phone's version aside
                 await copyDir(await targetWorkspaceHandle.getDirectoryHandle(op.canvas), await targetWorkspaceHandle.getDirectoryHandle(op.to, { create: true }));
             } else if (op.op === 'put') {
-                if (!safeRel(op.path)) continue;
+                if (!safeRel(op.path)) return;
                 await keepAside(op.canvas);
                 const segs = op.path.split('/');
                 const f = await fileAt(batch, ['files', op.canvas, ...segs]);
                 const d = await dirAt(targetWorkspaceHandle, [op.canvas, ...segs.slice(0, -1)], true);
                 await writeBlob(d, segs[segs.length - 1], f);
             } else if (op.op === 'del') {
-                if (!safeRel(op.path)) continue;
+                if (!safeRel(op.path)) return;
                 await keepAside(op.canvas);
                 const segs = op.path.split('/');
                 try { await (await dirAt(targetWorkspaceHandle, [op.canvas, ...segs.slice(0, -1)])).removeEntry(segs[segs.length - 1]); } catch { /* already gone */ }
             } else if (op.op === 'drop') {
                 // Deleted on the PC: gone here too, unless it changed here since.
-                if (!(await exists(op.canvas))) continue;
+                if (!(await exists(op.canvas))) return;
                 const now = {};
                 await walk(await targetWorkspaceHandle.getDirectoryHandle(op.canvas), '', async (rel, file) => { now[rel] = await sha256(file); });
                 const was = op.files || {};
@@ -244,7 +264,6 @@
                 if (same) await targetWorkspaceHandle.removeEntry(op.canvas, { recursive: true });
             }
         }
-        return aside;
     }
 
     /* ------------------------------------------------------- the home screen */
@@ -311,12 +330,29 @@
         } finally { setupBtn.disabled = false; }
     });
 
+    /* The PC's changes taken in, saying on the USB sync bar how far it has got,
+     * what it still waits for, or what went wrong (t-bae0747ece). */
+    let takingIn = false;
+    async function takeInShown() {
+        const show = (text) => { panel.classList.remove('hidden'); stateEl.textContent = text; };
+        takingIn = true;
+        try {
+            const r = await serial(() => takeIn(show));
+            return { ...r, error: null };
+        } catch (e) {
+            console.warn('Taking in the PC\'s changes failed', e);
+            return { taken: 0, aside: [], waiting: null, error: `${e && e.name ? `${e.name} - ${e.message}` : e}` };
+        } finally { takingIn = false; }
+    }
+    const takeInNote = (r) => r.error ? `Could not bring in the PC's changes: ${r.error}`
+        : r.waiting ? `The PC's changes are not all here yet - waiting for ${r.waiting}.`
+            : r.aside.length ? `Kept your own changes beside the PC's: ${r.aside.map((a) => `"${a.copy}"`).join(', ')}.` : '';
+
     async function onHome() {
-        if (!targetWorkspaceHandle) return;
-        const r = await serial(takeIn);
+        if (!targetWorkspaceHandle || takingIn) return;
+        const r = await takeInShown();
         if (r.taken) await loadFabricsGrid();
-        const note = r.aside.length ? `Kept your own changes beside the PC's: ${r.aside.map((a) => `"${a.copy}"`).join(', ')}.` : '';
-        await showState(note);
+        await showState(takeInNote(r));
         scheduleManifest(0);
     }
 
@@ -638,7 +674,12 @@
                 render({ title: 'Synced', text: `${st.text}. Go to the home screen to bring the PC's changes into "${currentFabricName}".`, bar: 1, ok: true, final: true, home: true });
                 return;
             }
-            const r = await serial(takeIn);
+            const r = await takeInShown();
+            if (r.error) {
+                render({ title: 'Could not bring in the changes', text: takeInNote(r), bar: 1, bad: true, final: true });
+                await showState(takeInNote(r));
+                return;
+            }
             const m = (await readJson(await xpDir(), 'manifest.json')) || {};
             if (r.taken || (m.applied || []).includes(st.batch)) {
                 if (r.taken && homeScreen && !homeScreen.classList.contains('hidden')) { await loadFabricsGrid(); await showState(); }
