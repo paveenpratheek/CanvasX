@@ -257,3 +257,118 @@ body.xp-phone .xp-pop { place-items: end center; padding: 16px 16px calc(24px + 
 body.xp-phone .xp-pop-card { width: 100%; padding: 20px; border-radius: 20px; }
 body.xp-phone .xp-pop-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--xp-accent-soft); color: var(--xp-accent-text); }
 body.xp-phone .xp-pop-actions .home-btn { min-height: 44px; }
+
+/* =====================================================================================
+ * The logo (t-bea4bb5b8d): the app icon's mark beside the CanvasXP wordmark.
+ * ===================================================================================== */
+.xp-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.xp-mark { flex: none; width: 40px; height: 40px; }
+.home-header h1 { letter-spacing: -0.02em; }
+.xp-xp { color: #a5b4fc; }
+:root[data-theme="light"] .xp-xp { color: #4338ca; }
+
+/* =====================================================================================
+ * A tablet (t-12c54c13d0): the phone design, sized up. Upright it keeps the dock and
+ * the sheet; sideways (body.xp-side) the tools stand down the left edge, the agent chat
+ * is a panel on the right and the home screen has a side column. Nothing drawn on a
+ * canvas changes (t-e1d7b8a3de).
+ * ===================================================================================== */
+
+/* -------------------------------------------------------------------- home */
+body.xp-tab .home-header { padding: 28px 32px 10px; }
+body.xp-tab .home-header h1 { font-size: 30px; }
+body.xp-tab .xp-mark { width: 48px; height: 48px; }
+body.xp-tab .xp-home-sub { font-size: 14px; }
+body.xp-tab #btn-theme-home { width: 48px; height: 48px; border-radius: 14px; }
+body.xp-tab .xp-open-row { flex: 0 1 560px; margin-left: auto; }
+body.xp-tab .xp-folder-row { padding: 4px 24px 12px 32px; font-size: 15px; }
+body.xp-tab .xp-sync { margin: 0 32px 24px; padding: 18px 20px; border-radius: 18px; }
+body.xp-tab .xp-sync-icon { width: 40px; height: 40px; border-radius: 12px; }
+body.xp-tab #xp-setup { flex: 0 0 auto; padding: 0 22px; }
+body.xp-tab .xp-grid-head { padding: 4px 36px 12px; }
+body.xp-tab .xp-grid-head h2 { font-size: 18px; }
+body.xp-tab .fabrics-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 0 32px 28px; }
+body.xp-tab .fabric-card { padding: 10px; gap: 10px; border-radius: 18px; }
+body.xp-tab .fabric-card-icon { height: 124px; border-radius: 12px; }
+body.xp-tab .fabric-card-info h3 { font-size: 15px; }
+body.xp-tab .xp-agent-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 0 32px 28px; }
+body.xp-tab .xp-agent-grid .fabric-card { min-height: 64px; }
+body.xp-tab .xp-agent-grid .fabric-card-icon { height: 40px; width: 40px; }
+body.xp-tab #btn-new-fabric { right: 32px; bottom: calc(32px + env(safe-area-inset-bottom)); height: 58px; padding: 0 24px 0 20px; border-radius: 18px; font-size: 16px; }
+
+/* Sideways: the folder, USB sync and the agent's canvases in a column on the left, the canvases beside it */
+body.xp-side .workspace-content:not(.hidden) {
+    display: grid; grid-template-columns: 360px minmax(0, 1fr); grid-template-rows: auto auto auto 1fr;
+    column-gap: 8px; align-items: start; padding-right: 16px;
+}
+body.xp-side .workspace-header { display: contents; }
+body.xp-side .xp-folder-row { grid-column: 1; grid-row: 1; }
+body.xp-side .xp-sync { grid-column: 1; grid-row: 2; margin-right: 0; }
+body.xp-side #xp-setup { flex: 1 0 100%; }
+body.xp-side .xp-agent-head { grid-column: 1; grid-row: 3; }
+body.xp-side .xp-agent-grid { grid-column: 1; grid-row: 4; display: flex; flex-direction: column; gap: 8px; padding-right: 0; }
+body.xp-side .xp-canvas-head { grid-column: 2; grid-row: 1; align-self: end; padding-left: 20px; }
+body.xp-side .fabrics-grid { grid-column: 2; grid-row: 2 / 5; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0 16px 28px; }
+body.xp-side .fabrics-grid .fabric-card-icon { height: 108px; }
+
+/* ------------------------------------------------------------ a canvas: top bar and zoom */
+body.xp-tab.xp-on-canvas .xp-topbar { left: 16px; right: auto; top: 16px; width: min(440px, calc(100vw - 380px)); height: 60px; padding: 0 8px; border-radius: 18px; }
+body.xp-tab #xp-tb-name { font-size: 16px; }
+body.xp-phone.xp-tab.xp-on-canvas .xp-zoom {
+    display: flex; align-items: center; gap: 2px; position: fixed; right: 16px; top: 16px; z-index: 120; height: 60px; box-sizing: border-box;
+    padding: 0 8px; border-radius: 18px; box-shadow: var(--xp-shadow); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background: var(--panel-bg-solid); border: 1px solid var(--panel-border); color: var(--text-color);
+}
+body.xp-tab .xp-zoom button:not(.xp-icon-btn) { width: 44px; height: 44px; border-radius: 12px; font-size: 22px; }
+body.xp-tab .xp-zoom-pct { min-width: 48px; font-size: 14px; }
+.xp-sep { display: none; }
+body.xp-tab .xp-zoom .xp-sep { display: block; width: 1px; height: 28px; margin: 0 6px; background: var(--panel-border); }
+body.xp-tab.agent-view .xp-zoom .xp-sep { display: none; }
+body.xp-tab #settings-popup { right: 16px !important; top: 88px !important; }
+
+/* ------------------------------------------------------------ the tools */
+/* Upright: the dock, in the middle of the bottom edge, with bigger buttons */
+body.xp-tab #toolbar { left: 16px; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); padding: 8px; border-radius: 20px; }
+body.xp-tab #toolbar > .tool-group:first-child { margin-left: auto; }
+body.xp-tab #toolbar > .tool-group:last-child { margin-right: auto; }
+body.xp-tab #toolbar .tool-btn { width: 62px; height: 60px; border-radius: 14px; }
+body.xp-tab.xp-on-canvas:not(.agent-view) .xp-dock-hint:not(.seen) { bottom: calc(104px + env(safe-area-inset-bottom)); }
+body.xp-tab #color-palette-popup { bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+
+/* Sideways: a column down the left edge, in reach of the thumb */
+body.xp-side #toolbar {
+    top: 92px; bottom: auto; left: 16px; right: auto; width: auto; max-height: calc(100dvh - 108px);
+    flex-direction: column; align-items: center; padding: 6px; border-radius: 20px;
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
+}
+body.xp-side #toolbar > .tool-group { flex-direction: column; margin: 0; }
+body.xp-side #toolbar .tool-btn { width: 64px; height: 58px; }
+body.xp-side.xp-on-canvas .xp-dock-hint { display: none !important; }
+body.xp-side #color-palette-popup { top: 50% !important; bottom: auto !important; left: 108px !important; transform: translateY(-50%) !important; }
+
+/* ------------------------------------------------------------ the agent chat */
+/* Upright: a taller sheet */
+body.xp-tab.agent-view #agent-chat { height: min(56dvh, 680px); border-radius: 24px 24px 0 0; font-size: 15px; }
+body.xp-tab #agent-chat-log { padding: 16px 24px; }
+body.xp-tab #agent-chat-log li { max-width: 72%; font-size: 15px; }
+body.xp-tab .agent-chat-compose { padding: 12px 24px 20px; }
+body.xp-tab #agent-chat-attach, body.xp-tab #agent-chat-model, body.xp-tab #agent-chat-send { height: 48px; }
+body.xp-tab #agent-chat-attach { width: 48px; }
+
+/* Sideways: a panel on the right, the canvas beside it; folded, a card at the bottom right */
+body.xp-side.agent-view #agent-chat {
+    left: auto; right: 0; top: 0; bottom: 0; width: 400px; height: auto;
+    border-radius: 0; border: none; border-left: 1px solid var(--panel-border); box-shadow: none;
+}
+body.xp-side.agent-view #agent-chat.folded { top: auto; right: 16px; bottom: 16px; width: 360px; height: auto; border-radius: 18px; border: 1px solid var(--panel-border); box-shadow: var(--xp-shadow); }
+body.xp-side .xp-sheet-handle { display: none; }
+body.xp-side #agent-chat .agent-chat-head { padding: 14px 8px 12px 18px; }
+body.xp-side #agent-chat-log { padding: 14px 16px; }
+body.xp-side #agent-chat-log li { max-width: 86%; }
+body.xp-side .agent-chat-compose { padding: 12px 16px 16px; }
+body.xp-phone.xp-side.agent-view:has(#agent-chat:not(.folded)) .xp-zoom { right: 416px; }
+body.xp-side.agent-view:has(#agent-chat:not(.folded)) .xp-topbar { width: min(440px, calc(100vw - 416px - 220px)); }
+
+/* ------------------------------------------------------------ the sync popup: a card in the middle */
+body.xp-tab .xp-pop { place-items: center; }
+body.xp-tab .xp-pop-card { width: min(460px, 100%); }

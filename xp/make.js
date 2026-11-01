@@ -19,8 +19,10 @@ const version = Date.now().toString(36);
 // Emptied rather than removed: a local server for the phone may be serving from it.
 fs.mkdirSync(SITE, { recursive: true });
 for (const f of fs.readdirSync(SITE)) fs.rmSync(path.join(SITE, f), { recursive: true, force: true });
-for (const f of ['script.js', 'style.css', 'icon-192.png', 'icon-512.png']) fs.copyFileSync(path.join(APP, f), path.join(SITE, f));
+for (const f of ['script.js', 'style.css']) fs.copyFileSync(path.join(APP, f), path.join(SITE, f));
 for (const f of ['xp.js', 'xp.css', 'manifest.json']) fs.copyFileSync(path.join(XP, f), path.join(SITE, f));
+// CanvasXP's own icons, not CanvasX's (t-bea4bb5b8d); icons/render.mjs draws the PNGs from the SVGs.
+for (const f of ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'icon-180.png', 'favicon.svg']) fs.copyFileSync(path.join(XP, 'icons', f), path.join(SITE, f));
 fs.writeFileSync(path.join(SITE, 'sw.js'), fs.readFileSync(path.join(XP, 'sw.js'), 'utf8').replace('__VERSION__', version));
 
 let html = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
@@ -36,5 +38,7 @@ swap(/(<meta name="viewport" content="[^"]*)(")/, '$1, interactive-widget=resize
 swap(/<link rel="stylesheet" href="style\.css\?v=[^"]*">/, `<link rel="stylesheet" href="style.css?v=${version}">\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
 swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
 swap(/<h1>CanvasX<\/h1>/, '<h1>CanvasXP</h1>');
+swap(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#141418">');
+swap(/<link rel="apple-touch-icon" href="[^"]*">/, '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n    <link rel="apple-touch-icon" href="icon-180.png">');
 fs.writeFileSync(path.join(SITE, 'index.html'), html);
 console.log(`CanvasXP built in ${path.relative(process.cwd(), SITE) || SITE} (version ${version}).`);

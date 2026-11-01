@@ -836,21 +836,42 @@
 
     /* ------------------------------------------------------ the phone layout */
 
-    /* The approved phone design (t-1c580a5971), on a phone or a phone turned
-     * sideways: body.xp-phone switches it on. Every colour comes from CanvasX's
-     * theme variables, so its light/dark switch restyles it all. */
-    const phoneMQ = matchMedia('(max-width: 640px), (max-height: 500px)');
-    const setPhone = () => document.body.classList.toggle('xp-phone', phoneMQ.matches);
-    phoneMQ.addEventListener('change', setPhone);
+    /* The approved phone design (t-1c580a5971) on any screen touched with
+     * fingers, and on a small one (t-3de3d9e805): body.xp-phone switches it on,
+     * so a tablet keeps it however it is turned and a PC with a mouse keeps
+     * CanvasX's layout. A tablet adds body.xp-tab, and held sideways body.xp-side
+     * (t-12c54c13d0). Only the chrome changes: what a canvas draws - totems,
+     * areas, boxes - keeps CanvasX's look (t-e1d7b8a3de). Every colour comes from
+     * CanvasX's theme variables, so its light/dark switch restyles it all. */
+    const phoneMQ = matchMedia('(pointer: coarse), (max-width: 640px), (max-height: 500px)');
+    const tabMQ = matchMedia('(min-width: 700px) and (min-height: 560px)');
+    const sideMQ = matchMedia('(orientation: landscape)');
+    const layoutHooks = [];
+    const setPhone = () => {
+        const phone = phoneMQ.matches;
+        const tab = phone && tabMQ.matches;
+        document.body.classList.toggle('xp-phone', phone);
+        document.body.classList.toggle('xp-tab', tab);
+        document.body.classList.toggle('xp-side', tab && sideMQ.matches);
+        for (const hook of layoutHooks) hook();
+    };
+    for (const mq of [phoneMQ, tabMQ, sideMQ]) mq.addEventListener('change', setPhone);
     setPhone();
+    const onTablet = () => document.body.classList.contains('xp-tab');
     const make = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
     const iconBtn = (id, label, d) => { const b = make('button', 'xp-icon-btn', svg(d)); b.id = id; b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; return b; };
 
-    // Home: a line under the name, the folder in use, and "New canvas".
+    // CanvasXP's mark (t-bea4bb5b8d): an area, a totem and the link between them - the app icon's drawing.
+    const MARK = '<svg class="xp-mark" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="15" fill="#4f46e5"/><rect x="11" y="13" width="28" height="21" rx="5" fill="#fff" fill-opacity=".18" stroke="#fff" stroke-width="3"/><path d="M25 34v5a6 6 0 0 0 6 6h2" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/><rect x="33" y="39" width="21" height="12" rx="4" fill="#fff"/><circle cx="48" cy="19" r="4.5" fill="#c7d2fe"/></svg>';
+
+    // Home: the logo, a line under the name, the folder in use, and "New canvas".
     {
         const h1 = document.querySelector('.home-header h1');
+        h1.innerHTML = 'Canvas<span class="xp-xp">XP</span>';
+        const brand = make('div', 'xp-brand', MARK);
         const titles = make('div', 'xp-home-titles');
-        h1.before(titles);
+        h1.before(brand);
+        brand.append(titles);
         titles.append(h1, make('span', 'xp-home-sub', 'Your canvases, on this phone'));
         const folderRow = make('div', 'xp-folder-row', `${svg(ICONS.folder, 16)}<span class="xp-folder-label">Folder</span><strong id="xp-folder-name"></strong>`);
         // Picking another folder: once one is picked, Restore no longer means anything (t-6a62beb22c).
@@ -886,8 +907,8 @@
     }
 
     // The canvases in two columns, the agent's apart in a list saying what waits for the PC.
-    const gridHead = make('div', 'xp-grid-head', '<h2>Canvases</h2><span id="xp-canvas-count"></span>');
-    const agentHead = make('div', 'xp-grid-head', '<h2>The agent\'s canvases</h2><span>view only</span>');
+    const gridHead = make('div', 'xp-grid-head xp-canvas-head', '<h2>Canvases</h2><span id="xp-canvas-count"></span>');
+    const agentHead = make('div', 'xp-grid-head xp-agent-head', '<h2>The agent\'s canvases</h2><span>view only</span>');
     const agentGrid = make('div', 'xp-agent-grid');
     agentGrid.id = 'xp-agent-grid';
     {
@@ -952,6 +973,13 @@
     zoomIn.addEventListener('click', () => keyZoom(1.25));
     zoomBox.append(zoomOut, zoomPct, zoomIn);
     document.body.append(topbar, zoomBox);
+    // On a tablet the top bar keeps the canvas's name; light/dark and settings join the zoom at the top right.
+    const zoomSep = make('span', 'xp-sep');
+    layoutHooks.push(() => {
+        if (onTablet()) zoomBox.append(zoomSep, themeBtn, moreBtn);
+        else { zoomSep.remove(); topbar.append(themeBtn, moreBtn); }
+    });
+    setPhone();
     setInterval(() => {
         if (!document.body.classList.contains('xp-phone') || document.hidden) return;
         const t = `${Math.round(state.camera.zoom * 100)}%`;
@@ -974,7 +1002,10 @@
         const onCanvas = Boolean(currentFabricName) && homeScreen.classList.contains('hidden');
         document.body.classList.toggle('xp-on-canvas', onCanvas);
         document.getElementById('xp-tb-name').textContent = currentFabricName || '';
-        document.getElementById('xp-tb-sub').textContent = agentCanvas ? 'Drawn by NoteX from the agent\'s scripts' : 'Saved on this phone';
+        const device = onTablet() ? 'tablet' : 'phone';
+        document.getElementById('xp-tb-sub').textContent = agentCanvas ? 'Drawn by NoteX from the agent\'s scripts' : `Saved on this ${device}`;
+        const sub = document.querySelector('.xp-home-sub');
+        if (sub) sub.textContent = `Your canvases, on this ${device}`;
         const folder = document.getElementById('xp-folder-name');
         if (folder) folder.textContent = targetWorkspaceHandle ? targetWorkspaceHandle.name : '';
     }

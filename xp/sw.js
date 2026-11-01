@@ -2,7 +2,7 @@
  * the installed app opens without a connection (t-66914c8b0f). make.js puts
  * the build's version in CACHE_NAME. */
 const CACHE_NAME = 'canvasxp-__VERSION__';
-const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './icon-180.png', './favicon.svg'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
