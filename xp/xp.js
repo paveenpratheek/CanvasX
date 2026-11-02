@@ -860,7 +860,7 @@
         tabletRow.style.display = 'none';
         const note = document.createElement('p');
         note.className = 'xp-touch-note';
-        note.textContent = 'Touch: two fingers move the canvas, a two-finger tap opens options, and three-finger swipes open Mission Control, Constellation and Widgets. The pen or a mouse clicks, drags and draws.';
+        note.textContent = 'Touch: two fingers move the canvas, a two-finger tap opens options, and three-finger swipes open Mission Control, Constellation and Widgets, and a three-finger tap shows or hides a stick at the bottom left that moves the canvas. The pen or a mouse clicks, drags and draws.';
         tabletRow.after(note);
     }
 

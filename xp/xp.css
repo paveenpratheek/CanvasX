@@ -271,6 +271,10 @@ body.xp-phone #agent-chat-attach { width: 44px; height: 44px; border-radius: 12p
 body.xp-phone #agent-chat-model { height: 44px; padding: 0 10px; border-radius: 12px; background: var(--xp-field); font-size: 14px; margin-left: auto; }
 body.xp-phone #agent-chat-send { height: 44px; padding: 0 20px; border-radius: 12px; font-size: 15px; }
 
+/* The touch stick: above the dock (or the folded chat) on a phone, beside the tool rail sideways */
+body.xp-phone #touch-stick { left: 18px; bottom: calc(108px + env(safe-area-inset-bottom)); }
+body.xp-side #touch-stick { left: 112px; bottom: calc(24px + env(safe-area-inset-bottom)); }
+
 /* ------------------------------------------------------- Mission Control: one column a finger scrolls */
 body.xp-phone #mission-control-overlay { padding: 28px 16px calc(32px + env(safe-area-inset-bottom)); touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 body.xp-phone .mc-head { margin-bottom: 22px; }

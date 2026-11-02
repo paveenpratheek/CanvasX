@@ -3327,3 +3327,24 @@ body.agent-view #agent-chat.folded { bottom: auto; }
 #progress-count { flex: none; font-variant-numeric: tabular-nums; color: #9ca3af; }
 /* The table menu's own display: flex is inline; hidden means gone, not below the screen (t-bf4a4a1092) */
 #table-context-menu.hidden { display: none !important; }
+
+/* The touch stick (t-945ab87704): a three-finger tap in Tablet Mode shows it at the bottom left,
+   see-through so the canvas shows beneath; held, it is a little clearer. */
+#touch-stick {
+    display: none; position: fixed; left: 24px; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 140;
+    width: 124px; height: 124px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.06) 0 55%, rgba(255, 255, 255, 0.12) 56% 100%);
+    border: 2px solid rgba(255, 255, 255, 0.28); box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0.55; transition: opacity 0.15s ease;
+}
+#touch-stick.on { display: block; }
+#touch-stick.held { opacity: 0.85; }
+.touch-stick-knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.55); border: 2px solid rgba(255, 255, 255, 0.75); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    pointer-events: none; transition: transform 0.12s ease-out;
+}
+#touch-stick.held .touch-stick-knob { transition: none; }
+:root[data-theme="light"] #touch-stick { background: radial-gradient(circle, rgba(15, 23, 42, 0.05) 0 55%, rgba(15, 23, 42, 0.1) 56% 100%); border-color: rgba(15, 23, 42, 0.3); }
+:root[data-theme="light"] .touch-stick-knob { background: rgba(15, 23, 42, 0.35); border-color: rgba(15, 23, 42, 0.55); }
+body:has(#mission-control-overlay:not(.hidden)) #touch-stick { display: none; }

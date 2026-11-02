@@ -71,6 +71,7 @@ function setTabletMode(on) {
     const toggle = document.getElementById('tablet-mode-toggle');
     if (toggle) toggle.checked = tabletMode;
     resetTouchGesture();
+    if (typeof showTouchStick === 'function') showTouchStick(); // the stick is Tablet Mode's (t-945ab87704)
 }
 
 // DOM Elements
@@ -1563,6 +1564,8 @@ let touchGestureFired = false;    // true once a swipe/tap has been dispatched f
 let touchPanLast = null;          // {x, y} last average position used for continuous 2-finger pan
 let touchSpreadLast = null;       // last distance between the two fingers, for pinch-to-zoom (t-211044b2fe)
 let touchSpreadStart = null;      // that distance when the second finger came down
+let touchGestureT0 = 0;           // when the current peak count was reached
+let touchGestureMoved = 0;        // the farthest any finger has moved since it came down
 
 const TOUCH_SWIPE_THRESHOLD = 70; // screen px the 3-finger average must travel to count as a swipe
 const TOUCH_TAP_MAX_MOVEMENT = 12; // screen px — below this, a 2-finger release counts as a tap
@@ -1589,14 +1592,17 @@ function resetTouchGesture() {
     touchGestureStart = null;
     touchGestureFired = false;
     touchPanLast = null;
+    touchGestureT0 = 0;
+    touchGestureMoved = 0;
 }
 
 // Each returns true when it fully consumed the event (caller must stop normal handling).
 function handleTabletTouchDown(e) {
     if (!tabletMode || e.pointerType !== 'touch') return false;
-    activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY, downTime: performance.now() });
+    activeTouches.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: 0, downTime: performance.now() });
     if (activeTouches.size > touchGestureMaxCount) {
         touchGestureMaxCount = activeTouches.size;
+        touchGestureT0 = performance.now();
         const avg = touchesAverage();
         touchGestureStart = { x: avg.x, y: avg.y };
         touchGestureFired = false; // a new finger raised the peak count -> re-arm for the new gesture meaning
@@ -1610,6 +1616,8 @@ function handleTabletTouchMove(e) {
     if (!activeTouches.has(e.pointerId)) return false;
     const rec = activeTouches.get(e.pointerId);
     rec.x = e.clientX; rec.y = e.clientY;
+    rec.moved = Math.max(rec.moved, Math.hypot(rec.x - rec.sx, rec.y - rec.sy));
+    touchGestureMoved = Math.max(touchGestureMoved, rec.moved);
 
     if (touchGestureFired) return true; // already dispatched — ignore further movement until reset
 
@@ -1694,6 +1702,14 @@ function handleTabletTouchUp(e) {
                 target: workspace, preventDefault: () => {}
             });
         }
+    }
+
+    // 3-finger TAP -> the touch stick shows or hides (t-945ab87704): all three up quickly,
+    // none having moved past a tap, and no swipe fired.
+    if (activeTouches.size === 0 && !touchGestureFired && touchGestureMaxCount === 3
+        && touchGestureMoved <= TOUCH_TAP_MAX_MOVEMENT * 2 && performance.now() - touchGestureT0 <= TOUCH_TAP_MAX_DURATION + 150) {
+        touchGestureFired = true;
+        toggleTouchStick();
     }
 
     if (activeTouches.size === 0) resetTouchGesture();
@@ -6327,6 +6343,81 @@ window.addEventListener('keyup', (e) => {
     heldMoves.delete(e.key);
 });
 window.addEventListener('blur', () => { heldMoves.clear(); keyShift = false; });
+
+// --- The touch stick (t-945ab87704) ---
+// In Tablet Mode a three-finger tap shows or hides a stick at the bottom left, like a touch game's:
+// pushed, it pans the canvas the way it points, faster the further it goes (a little dead zone at
+// the middle, full speed at the rim), for as long as it is held; let go, it springs back and stops.
+// It is remembered in this browser and shown only on an open canvas.
+const STICK_SPEED = 1300;   // screen pixels a second at the rim
+const STICK_DEAD = 0.12;    // the middle that does nothing, as a share of the radius
+const touchStick = document.createElement('div');
+touchStick.id = 'touch-stick';
+touchStick.setAttribute('aria-hidden', 'true');
+touchStick.innerHTML = '<div class="touch-stick-knob"></div>';
+document.body.appendChild(touchStick);
+const stickKnob = touchStick.firstElementChild;
+let stickOn = false;
+let stickPointer = null;   // the finger holding it
+let stickVec = { x: 0, y: 0 };
+let stickLast = 0;
+try { stickOn = localStorage.getItem('canvasx-touch-stick') === '1'; } catch (_) { /* storage blocked */ }
+
+function showTouchStick() {
+    const onCanvas = tabletMode && stickOn && homeScreen.classList.contains('hidden');
+    touchStick.classList.toggle('on', onCanvas);
+    if (!onCanvas) releaseStick();
+}
+function toggleTouchStick() {
+    stickOn = !stickOn;
+    try { localStorage.setItem('canvasx-touch-stick', stickOn ? '1' : '0'); } catch (_) { /* this page only */ }
+    showTouchStick();
+}
+function releaseStick() {
+    stickPointer = null;
+    stickVec = { x: 0, y: 0 };
+    stickKnob.style.transform = '';
+    touchStick.classList.remove('held');
+}
+function stickAt(e) {
+    const b = touchStick.getBoundingClientRect();
+    const r = b.width / 2;
+    let x = (e.clientX - (b.left + r)) / r, y = (e.clientY - (b.top + r)) / r;
+    const m = Math.hypot(x, y);
+    if (m > 1) { x /= m; y /= m; }
+    stickKnob.style.transform = `translate(${x * r * 0.6}px, ${y * r * 0.6}px)`;
+    stickVec = { x, y };
+}
+function stickFrame(now) {
+    if (stickPointer === null) { stickLast = 0; return; }
+    const dt = stickLast ? Math.min(0.1, (now - stickLast) / 1000) : 1 / 60;
+    stickLast = now;
+    const m = Math.hypot(stickVec.x, stickVec.y);
+    if (m > STICK_DEAD) {
+        const k = Math.pow((m - STICK_DEAD) / (1 - STICK_DEAD), 1.6) * STICK_SPEED * dt / m; // gentle near the middle
+        state.camera.x -= stickVec.x * k; // the view goes where the stick points, as the arrow keys do
+        state.camera.y -= stickVec.y * k;
+        scheduleRender();
+    }
+    requestAnimationFrame(stickFrame);
+}
+touchStick.addEventListener('pointerdown', (e) => {
+    if (stickPointer !== null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    stickPointer = e.pointerId;
+    touchStick.setPointerCapture(e.pointerId);
+    touchStick.classList.add('held');
+    cameraAnim = null; // the stick takes over from a camera flight
+    stickAt(e);
+    requestAnimationFrame(stickFrame);
+});
+touchStick.addEventListener('pointermove', (e) => { if (e.pointerId === stickPointer) stickAt(e); });
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    touchStick.addEventListener(type, (e) => { if (e.pointerId === stickPointer) releaseStick(); });
+}
+new MutationObserver(showTouchStick).observe(homeScreen, { attributes: true, attributeFilter: ['class'] });
+showTouchStick();
 
 // Render coalescing: many code paths call scheduleRender() (often several within one
 // event handler or one frame). Without coalescing, each would queue its own rAF callback
