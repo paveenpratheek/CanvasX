@@ -571,7 +571,9 @@
         if (name !== currentFabricName || !agentCanvas) return;
         // The model the canvas answers with: that of its last message waiting here, else the one NoteX keeps for it.
         const lastWaiting = waiting.length ? waiting[waiting.length - 1].model : null;
-        renderAgentChat({ ...r, model: lastWaiting || r.model, models: r.models || MODELS, ask: null });
+        // A chat NoteX synced before it offered Gemini lists Claude's models only: the phone's own list is added (t-078d8f1fd2).
+        const models = [...new Set([...(Array.isArray(r.models) ? r.models : []), ...MODELS])];
+        renderAgentChat({ ...r, model: lastWaiting || r.model, models, ask: null });
         const log = document.getElementById('agent-chat-log');
         const empty = log.querySelector('.agent-chat-empty');
         if (empty) {
