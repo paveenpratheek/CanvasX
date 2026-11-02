@@ -1613,6 +1613,20 @@ function handleTabletTouchMove(e) {
 
     if (touchGestureFired) return true; // already dispatched — ignore further movement until reset
 
+    // One finger in the constellation view moves it, once it has moved past a tap
+    // (t-e820f62abc): there is nothing there for a finger to draw or drag.
+    if (touchGestureMaxCount === 1 && activeTouches.size === 1 && state.isConstellationMode && touchGestureStart) {
+        if (!touchPanLast) {
+            if (Math.hypot(rec.x - touchGestureStart.x, rec.y - touchGestureStart.y) <= TOUCH_TAP_MAX_MOVEMENT) return true;
+            touchPanLast = { x: touchGestureStart.x, y: touchGestureStart.y };
+        }
+        state.camera.x += rec.x - touchPanLast.x;
+        state.camera.y += rec.y - touchPanLast.y;
+        touchPanLast = { x: rec.x, y: rec.y };
+        scheduleRender();
+        return true;
+    }
+
     if (touchGestureMaxCount === 2 && activeTouches.size === 2) {
         // Continuous 2-finger PAN — apply the average position's frame-to-frame delta directly
         // to the camera, same effect as dragging with the pan tool - and PINCH, zooming about
@@ -1658,6 +1672,14 @@ function handleTabletTouchUp(e) {
     const rec = activeTouches.get(e.pointerId);
     activeTouches.delete(e.pointerId);
 
+    // One finger tapped in the constellation view: a totem's name goes to that totem, as a click does.
+    if (!touchGestureFired && touchGestureMaxCount === 1 && state.isConstellationMode && rec && !touchPanLast
+        && e.type === 'pointerup' && performance.now() - rec.downTime <= TOUCH_TAP_MAX_DURATION * 2) {
+        touchGestureFired = true;
+        const hit = constellationTotemAt(screenToWorld(rec.x, rec.y));
+        if (hit) jumpFromConstellation(hit);
+    }
+
     // 2-finger TAP -> options/context menu (the touch equivalent of a mouse right-click).
     // Only counts if the gesture's peak never exceeded 2 fingers, no swipe already fired, the
     // release is quick, and the average position barely moved.
@@ -1687,6 +1709,31 @@ function setupWorkspaceListeners() {
     workspace.addEventListener('pointerup', handleWorkspacePointerUp);
     workspace.addEventListener('pointercancel', handleWorkspacePointerUp);
     workspace.addEventListener('pointerleave', handleWorkspacePointerUp);
+}
+
+// The totem whose name tag is at worldPos in the constellation view, if any.
+function constellationTotemAt(worldPos) {
+    ctx.font = `500 ${16 / state.camera.zoom}px Inter, sans-serif`;
+    for (let i = state.totems.length - 1; i >= 0; i--) {
+        const t = state.totems[i];
+        const metrics = ctx.measureText(t.name);
+        const padX = 20 / state.camera.zoom;
+        const padY = 10 / state.camera.zoom;
+        const width = metrics.width + padX * 2;
+        const height = (16 / state.camera.zoom) + padY * 2;
+        if (worldPos.x >= t.x - width/2 && worldPos.x <= t.x + width/2 &&
+            worldPos.y >= t.y - height/2 && worldPos.y <= t.y + height/2) return t;
+    }
+    return null;
+}
+
+// Leaves the constellation view for that totem, at 100%.
+function jumpFromConstellation(totem) {
+    state.isConstellationMode = false;
+    document.body.classList.remove('constellation-mode');
+    const tz = 1; // Always zoom in to 100% when jumping to a specific totem
+    const canvasHeight = canvas.height / (window.devicePixelRatio || 1);
+    startCameraAnimation(-totem.x * tz, 120 - canvasHeight/2 - totem.y * tz, tz);
 }
 
 function handleWorkspaceWheel(e) {
@@ -1969,28 +2016,9 @@ function handleWorkspacePointerDown(e) {
         }
 
         if (state.isConstellationMode) {
-            let hitTotem = null;
-            ctx.font = `500 ${16 / state.camera.zoom}px Inter, sans-serif`;
-            for (let i = state.totems.length - 1; i >= 0; i--) {
-                let t = state.totems[i];
-                const metrics = ctx.measureText(t.name);
-                const padX = 20 / state.camera.zoom;
-                const padY = 10 / state.camera.zoom;
-                const width = metrics.width + padX * 2;
-                const height = (16 / state.camera.zoom) + padY * 2;
-                if (worldPos.x >= t.x - width/2 && worldPos.x <= t.x + width/2 && 
-                    worldPos.y >= t.y - height/2 && worldPos.y <= t.y + height/2) {
-                    hitTotem = t;
-                    break;
-                }
-            }
-            
+            const hitTotem = constellationTotemAt(worldPos);
             if (hitTotem) {
-                state.isConstellationMode = false;
-                document.body.classList.remove('constellation-mode');
-                const tz = 1; // Always zoom in to 100% when jumping to a specific totem
-                const canvasHeight = canvas.height / (window.devicePixelRatio || 1);
-                startCameraAnimation(-hitTotem.x * tz, 120 - canvasHeight/2 - hitTotem.y * tz, tz);
+                jumpFromConstellation(hitTotem);
                 return;
             }
             
@@ -5967,11 +5995,22 @@ function openMissionControl() {
             card.setAttribute('draggable', 'false');
             card.ondragstart = (e) => { e.preventDefault(); return false; };
             
+            // A mouse or pen picks a totem as it presses; a finger only on a tap (click), since a
+            // finger put down on a card may be starting to scroll the overview (t-e820f62abc).
             card.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') return;
                 // Prevent default to stop any native dragging right at the start
                 e.preventDefault();
                 e.stopPropagation();
-                
+                goToTotem();
+            });
+            card.addEventListener('click', (e) => {
+                if (e.pointerType && e.pointerType !== 'touch') return; // already gone to on pointerdown
+                if (overlay.classList.contains('hidden')) return;
+                e.stopPropagation();
+                goToTotem();
+            });
+            function goToTotem() {
                 const targetZoom = 0.5;
                 
                 // Calculate camera Y so the totem appears near the top (150px from top)
@@ -5987,8 +6026,8 @@ function openMissionControl() {
                 setTimeout(() => {
                     startCameraAnimation(targetCamX, targetCamY, targetZoom);
                 }, 50);
-            });
-            
+            }
+
             grid.appendChild(card);
         });
     }
