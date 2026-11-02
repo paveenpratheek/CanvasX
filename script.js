@@ -6295,7 +6295,11 @@ function keyMoveFrame(now) {
 // by the distance along it plus twice the distance off it, so the jump goes the way the arrow
 // points (t-302eba410d). A press during a flight goes on from where that flight is heading.
 function jumpToTotem(key) {
-    const dx = -KEY_MOVES[key][0], dy = -KEY_MOVES[key][1]; // the camera moves against the view
+    jumpToward(-KEY_MOVES[key][0], -KEY_MOVES[key][1]); // the camera moves against the view
+}
+
+// The same, any way at all: (dx, dy) a unit vector on the screen. False when no totem lies that way.
+function jumpToward(dx, dy) {
     const cam = cameraAnim ? { x: cameraAnim.targetX, y: cameraAnim.targetY, zoom: cameraAnim.targetZoom } : state.camera;
     const cx = -cam.x / cam.zoom, cy = -cam.y / cam.zoom; // the world point in the middle of the screen
     let best = null, bestScore = Infinity;
@@ -6307,9 +6311,10 @@ function jumpToTotem(key) {
         const score = ahead + off * 2;
         if (score < bestScore) { best = t; bestScore = score; }
     }
-    if (!best) return;
+    if (!best) return false;
     heldMoves.clear();
     startCameraAnimation(-best.x * cam.zoom, -best.y * cam.zoom, cam.zoom);
+    return true;
 }
 
 window.addEventListener('keydown', (e) => {
@@ -6349,19 +6354,46 @@ window.addEventListener('blur', () => { heldMoves.clear(); keyShift = false; });
 // pushed, it pans the canvas the way it points, faster the further it goes (a little dead zone at
 // the middle, full speed at the rim), for as long as it is held; let go, it springs back and stops.
 // It is remembered in this browser and shown only on an open canvas.
+// A double tap on the stick switches it to totem jumps and back (t-d6c0782664): pushed past the
+// middle it flies to the nearest totem or sub-totem that way, as Shift+Alt+arrow does but in any
+// direction; held there it goes on to the next one after each flight; back to the middle, it is
+// ready for another push.
 const STICK_SPEED = 1300;   // screen pixels a second at the rim
 const STICK_DEAD = 0.12;    // the middle that does nothing, as a share of the radius
+const STICK_JUMP_AT = 0.55; // how far out a push jumps
+const STICK_REARM = 0.3;    // back within this, the next push jumps again
+const STICK_REPEAT_MS = 650; // held out, the next jump after this long
+const STICK_DOUBLE_MS = 320; // two taps within this make a double tap
 const touchStick = document.createElement('div');
 touchStick.id = 'touch-stick';
 touchStick.setAttribute('aria-hidden', 'true');
-touchStick.innerHTML = '<div class="touch-stick-knob"></div>';
+touchStick.innerHTML = '<div class="touch-stick-knob"></div><span class="touch-stick-mode"></span>';
 document.body.appendChild(touchStick);
 const stickKnob = touchStick.firstElementChild;
+const stickModeLabel = touchStick.lastElementChild;
 let stickOn = false;
+let stickJump = false;     // totem jumps rather than gliding
 let stickPointer = null;   // the finger holding it
 let stickVec = { x: 0, y: 0 };
 let stickLast = 0;
-try { stickOn = localStorage.getItem('canvasx-touch-stick') === '1'; } catch (_) { /* storage blocked */ }
+let stickDown = null;      // { at, far } of this press: when it began and how far out it went
+let stickTapAt = 0;        // when the last short tap ended
+let stickArmed = true;     // a jump may go
+let stickJumpAt = 0;       // when the last jump went
+let stickLabelTimer = null;
+try {
+    stickOn = localStorage.getItem('canvasx-touch-stick') === '1';
+    stickJump = localStorage.getItem('canvasx-touch-stick-mode') === 'jump';
+} catch (_) { /* storage blocked */ }
+function showStickMode(say) {
+    touchStick.classList.toggle('jump', stickJump);
+    stickModeLabel.textContent = stickJump ? 'Totem jumps' : 'Glide';
+    clearTimeout(stickLabelTimer);
+    if (!say) return;
+    touchStick.classList.add('say');
+    stickLabelTimer = setTimeout(() => touchStick.classList.remove('say'), 1300);
+}
+showStickMode(false);
 
 function showTouchStick() {
     const onCanvas = tabletMode && stickOn && homeScreen.classList.contains('hidden');
@@ -6393,7 +6425,19 @@ function stickFrame(now) {
     const dt = stickLast ? Math.min(0.1, (now - stickLast) / 1000) : 1 / 60;
     stickLast = now;
     const m = Math.hypot(stickVec.x, stickVec.y);
-    if (m > STICK_DEAD) {
+    if (stickDown) stickDown.far = Math.max(stickDown.far, m);
+    if (stickJump) {
+        if (m < STICK_REARM) stickArmed = true;
+        else if (m >= STICK_JUMP_AT && (stickArmed || (!cameraAnim && now - stickJumpAt >= STICK_REPEAT_MS))) {
+            stickArmed = false;
+            stickJumpAt = now;
+            if (!jumpToward(stickVec.x / m, stickVec.y / m)) { // nothing that way: the stick says so
+                touchStick.classList.remove('none');
+                void touchStick.offsetWidth;
+                touchStick.classList.add('none');
+            }
+        }
+    } else if (m > STICK_DEAD) {
         const k = Math.pow((m - STICK_DEAD) / (1 - STICK_DEAD), 1.6) * STICK_SPEED * dt / m; // gentle near the middle
         state.camera.x -= stickVec.x * k; // the view goes where the stick points, as the arrow keys do
         state.camera.y -= stickVec.y * k;
@@ -6408,13 +6452,29 @@ touchStick.addEventListener('pointerdown', (e) => {
     stickPointer = e.pointerId;
     touchStick.setPointerCapture(e.pointerId);
     touchStick.classList.add('held');
-    cameraAnim = null; // the stick takes over from a camera flight
+    // The second of two quick taps switches between gliding and totem jumps.
+    if (stickTapAt && performance.now() - stickTapAt <= STICK_DOUBLE_MS) {
+        stickTapAt = 0;
+        stickJump = !stickJump;
+        try { localStorage.setItem('canvasx-touch-stick-mode', stickJump ? 'jump' : 'glide'); } catch (_) { /* this page only */ }
+        showStickMode(true);
+        stickDown = null; // not the first tap of another double tap
+    } else stickDown = { at: performance.now(), far: 0 };
+    stickArmed = true;
+    if (!stickJump) cameraAnim = null; // gliding takes over from a camera flight; a jump goes on from it
     stickAt(e);
     requestAnimationFrame(stickFrame);
 });
 touchStick.addEventListener('pointermove', (e) => { if (e.pointerId === stickPointer) stickAt(e); });
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    touchStick.addEventListener(type, (e) => { if (e.pointerId === stickPointer) releaseStick(); });
+    touchStick.addEventListener(type, (e) => {
+        if (e.pointerId !== stickPointer) return;
+        // A short press near the middle is a tap, perhaps the first of a double tap.
+        const d = stickDown;
+        stickTapAt = d && e.type === 'pointerup' && performance.now() - d.at <= 250 && d.far < 0.35 ? performance.now() : 0;
+        stickDown = null;
+        releaseStick();
+    });
 }
 new MutationObserver(showTouchStick).observe(homeScreen, { attributes: true, attributeFilter: ['class'] });
 showTouchStick();

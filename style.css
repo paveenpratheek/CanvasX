@@ -3348,3 +3348,16 @@ body.agent-view #agent-chat.folded { bottom: auto; }
 :root[data-theme="light"] #touch-stick { background: radial-gradient(circle, rgba(15, 23, 42, 0.05) 0 55%, rgba(15, 23, 42, 0.1) 56% 100%); border-color: rgba(15, 23, 42, 0.3); }
 :root[data-theme="light"] .touch-stick-knob { background: rgba(15, 23, 42, 0.35); border-color: rgba(15, 23, 42, 0.55); }
 body:has(#mission-control-overlay:not(.hidden)) #touch-stick { display: none; }
+/* Totem jumps (t-d6c0782664): the accent ring and a diamond knob; the mode's name shows a moment when
+   switched; a push with no totem that way gives a little shake. */
+#touch-stick.jump { border-color: rgba(129, 140, 248, 0.9); background: radial-gradient(circle, rgba(99, 102, 241, 0.10) 0 55%, rgba(99, 102, 241, 0.22) 56% 100%); }
+#touch-stick.jump .touch-stick-knob { border-radius: 14px; rotate: 45deg; width: 46px; height: 46px; margin: -23px 0 0 -23px; background: rgba(99, 102, 241, 0.7); border-color: rgba(255, 255, 255, 0.8); }
+.touch-stick-mode {
+    position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+    padding: 4px 10px; border-radius: 999px; background: rgba(15, 15, 17, 0.8); color: #fff; font-size: 12px; font-weight: 600;
+    opacity: 0; transition: opacity 0.2s ease;
+}
+#touch-stick.say .touch-stick-mode { opacity: 1; }
+#touch-stick.say { opacity: 0.9; }
+#touch-stick.none { animation: touch-stick-none 0.3s ease; }
+@keyframes touch-stick-none { 25% { translate: -6px 0; } 50% { translate: 6px 0; } 75% { translate: -3px 0; } }
