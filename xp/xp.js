@@ -466,7 +466,7 @@
     const MESSAGE = 'message.md';
     const NOT_ANSWERED = 'Not answered.txt';
     const MAX_TEXT = 4000;
-    const MODELS = ['sonnet', 'opus', 'haiku'];
+    const MODELS = ['sonnet', 'opus', 'haiku', 'gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low']; // as NoteX offers them (t-078d8f1fd2)
     let syncing = null; // NoteX's latest step while a sync runs
 
     async function chatOf(name) {
@@ -569,7 +569,9 @@
         const r = (dev && (await chatOf(name))) || { name, chat: [], model: 'sonnet', models: MODELS };
         const waiting = dev ? await queued(name) : [];
         if (name !== currentFabricName || !agentCanvas) return;
-        renderAgentChat({ ...r, models: r.models || MODELS, ask: null });
+        // The model the canvas answers with: that of its last message waiting here, else the one NoteX keeps for it.
+        const lastWaiting = waiting.length ? waiting[waiting.length - 1].model : null;
+        renderAgentChat({ ...r, model: lastWaiting || r.model, models: r.models || MODELS, ask: null });
         const log = document.getElementById('agent-chat-log');
         const empty = log.querySelector('.agent-chat-empty');
         if (empty) {

@@ -9794,7 +9794,12 @@ for (const type of ['drop', 'paste', 'dblclick', 'contextmenu', 'pointerdown']) 
 // the canvas from it, and keeps the conversation (t-4dc3f16e6e). CanvasX finds NoteX through
 // .notex/link.json, which NoteX writes into the workspace: its address and a token that opens only
 // an agent canvas's chat (NoteX t-76dff4fffe). A changed canvas is redrawn by the watch above.
-const MODEL_NAMES = { sonnet: 'Sonnet', opus: 'Opus', haiku: 'Haiku' };
+// Claude's models, and Gemini's through Antigravity, which NoteX also runs (t-078d8f1fd2).
+const MODEL_NAMES = {
+    sonnet: 'Sonnet', opus: 'Opus', haiku: 'Haiku',
+    'gemini-3.8-flash-high': 'Gemini 3.8 Flash (High)', 'gemini-3.8-flash-medium': 'Gemini 3.8 Flash (Medium)', 'gemini-3.8-flash-low': 'Gemini 3.8 Flash (Low)',
+};
+const isGeminiModel = (m) => /^gemini-/.test(String(m || ''));
 let chatTimer = null;
 let chatLink = null;
 let chatWorking = false;
@@ -9839,10 +9844,19 @@ function setChatState(text, bad = false) {
 }
 
 function renderAgentChat(r) {
+    // The models NoteX offers, Claude's and Gemini's apart; each canvas opens on its own model, the
+    // one its last message used, as NoteX keeps it (t-078d8f1fd2). Picked here, the next message uses it.
     const sel = document.getElementById('agent-chat-model');
-    if (!sel.options.length && r.models) {
-        for (const m of r.models) sel.append(new Option(MODEL_NAMES[m] || m, m));
-        sel.value = r.model || r.models[0];
+    if (r.models && sel.dataset.models !== r.models.join(',')) {
+        const group = (label, list) => { const g = document.createElement('optgroup'); g.label = label; g.append(...list.map(m => new Option(MODEL_NAMES[m] || m, m))); return g; };
+        const claude = r.models.filter(m => !isGeminiModel(m)), gemini = r.models.filter(isGeminiModel);
+        sel.replaceChildren(...(gemini.length ? [group('Claude', claude), group('Gemini · Antigravity', gemini)] : claude.map(m => new Option(MODEL_NAMES[m] || m, m))));
+        sel.dataset.models = r.models.join(',');
+        delete sel.dataset.canvas;
+    }
+    if (r.models && sel.dataset.canvas !== currentFabricName) {
+        sel.value = r.models.includes(r.model) ? r.model : r.models[0];
+        sel.dataset.canvas = currentFabricName || '';
     }
     const log = document.getElementById('agent-chat-log');
     const atEnd = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
