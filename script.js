@@ -5342,6 +5342,10 @@ function showTotemContextMenu(screenX, screenY, totem) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Rename
         </div>
+        <div class="area-ctx-item" data-action="move-label" title="Move the label alone; boxes then join whichever totem they are nearest">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="12" height="6" rx="3"/><polyline points="18 9 21 12 18 15"/><line x1="15" y1="12" x2="21" y2="12"/></svg>
+            Move Totem
+        </div>
         <div class="area-ctx-item" data-action="move-totem">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="19 9 22 12 19 15"/><polyline points="9 19 12 22 15 19"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
             Move Totem & Field
@@ -5385,21 +5389,21 @@ function showTotemContextMenu(screenX, screenY, totem) {
     });
     
     // Action handlers
-    // A sub-totem starts below its totem's field, in its colour; boxes join it once it is moved
-    // beside them (t-62c6ed9e8b).
+    // A sub-totem starts outside its totem's field, in its colour; boxes join it once it is
+    // moved beside them (t-62c6ed9e8b, t-f25cb7d99e).
     const addSub = menu.querySelector('[data-action="add-sub"]');
     if (addSub) addSub.addEventListener('click', () => {
         dismissTotemContextMenu();
         const name = prompt(`Sub-totem of ${totem.name} - its name:`);
         if (!name || !name.trim()) return;
-        const subs = subTotemsOf(totem);
+        const spot = clearSpotForSubTotem(totem);
         const sub = {
             id: Date.now() + Math.random().toString(36).substr(2, 5),
             name: name.trim(),
             color: totem.color || '#3b5a76',
             radius: 0,
-            x: totem.x + subs.length * 600,
-            y: totem.y + 700,
+            x: spot.x,
+            y: spot.y,
             isLocked: false,
             parentTotemId: totem.id
         };
@@ -5419,9 +5423,18 @@ function showTotemContextMenu(screenX, screenY, totem) {
         }
     });
 
+    // The label alone, until the next click; then every box joins whichever totem it is nearest,
+    // as the grouping always does (t-0f2882295b).
+    menu.querySelector('[data-action="move-label"]').addEventListener('click', () => {
+        dismissTotemContextMenu();
+        state.mode = 'move-totem';
+        state.movingTotemContext = { totem, drawings: [], areas: [], files: [], tables: [], totems: [], lastPos: { x: totem.x, y: totem.y } };
+        workspace.style.cursor = 'move';
+    });
+
     menu.querySelector('[data-action="move-totem"]').addEventListener('click', () => {
         dismissTotemContextMenu();
-        
+
         // The totem's own field (t-08dd5b6ef9)
         const radius = TOTEM_FIELD;
         // A totem moves with its sub-totems and what they hold (t-9b101d1e08).
@@ -7468,6 +7481,34 @@ function isSubTotem(t) {
 
 function subTotemsOf(totem) {
     return state.totems.filter(t => t.parentTotemId === totem.id && isSubTotem(t));
+}
+
+// Where a sub-totem made by hand starts: outside its totem's field, always (t-f25cb7d99e).
+// A label takes every box within TOTEM_FIELD of it, so the spot is more than that from every
+// box, drawing, file and table on the canvas and from every label - the first such spot below
+// the totem and what it holds, under its label first, then right and left, row by row. A fixed
+// offset cannot do it: a totem's field reaches ITEM_FIELD past each of its boxes too
+// (t-a5854e828d).
+function clearSpotForSubTotem(totem) {
+    const CLEAR = TOTEM_FIELD + 100;
+    const things = [...(state.areas || []), ...(state.drawings || []), ...(state.files || []).filter(f => !f.isHidden), ...(state.tables || [])];
+    const boxes = things.map(getItemBBox).filter(b => b && Number.isFinite(b.minX));
+    const labels = (state.totems || []).map(t => ({ x: t.x, y: t.y }));
+    let maxY = totem.y;
+    for (const it of things) {
+        if (it.linkedTotemId !== totem.id) continue;
+        const b = getItemBBox(it);
+        if (b && Number.isFinite(b.maxY)) maxY = Math.max(maxY, b.maxY);
+    }
+    const clear = (x, y) => boxes.every(b => distToBBox(x, y, b) > CLEAR) && labels.every(l => Math.hypot(l.x - x, l.y - y) > CLEAR);
+    for (let row = 0; row < 40; row++) {
+        const y = maxY + CLEAR + row * CLEAR;
+        for (let col = 0; col < 40; col++) {
+            const x = totem.x + (col % 2 ? 1 : -1) * Math.ceil(col / 2) * CLEAR;
+            if (clear(x, y)) return { x, y };
+        }
+    }
+    return { x: totem.x, y: maxY + CLEAR * 41 };
 }
 
 function drawTotems() {
