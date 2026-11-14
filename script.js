@@ -7094,23 +7094,39 @@ function isBBoxOnScreen(bbox) {
 // Links are rendered from inside drawAreas() by the top-most (highest-index) area they
 // connect, so an off-screen area must NOT be culled if it owns a link whose span reaches
 // the viewport — otherwise the link would disappear. Cheap over-approx: union of the two
-// endpoint areas' bboxes. Short-circuits instantly when there are no links.
-function areaOwnsVisibleLink(area) {
-    if (!state.links || state.links.length === 0) return false;
-    const idx = state.areas.indexOf(area);
-    return state.links.some(link => {
-        const fi = state.areas.findIndex(a => a.id === link.fromAreaId);
-        const ti = state.areas.findIndex(a => a.id === link.toAreaId);
-        if (fi === -1 || ti === -1) return false;
-        if (Math.max(fi, ti) !== idx) return false; // this area doesn't render the link
+// endpoint areas' bboxes.
+// Which area draws each link, and which of those own a link reaching the screen, are worked
+// out once per frame here, from an id-to-index map, rather than by searching every area for
+// both ends of every link from inside drawAreas' loop over the areas - on a canvas of 338
+// areas and 81 links that search alone took 83-105 ms a frame (t-5c88ed387c).
+function buildLinkFrame() {
+    const indexOf = new Map();    // area object -> its index, as state.areas.indexOf gave it
+    const firstWithId = new Map(); // area id -> index of the first area with it, as findIndex gave it
+    state.areas.forEach((a, i) => {
+        indexOf.set(a, i);
+        if (!firstWithId.has(a.id)) firstWithId.set(a.id, i);
+    });
+    const linksByOwner = new Map(); // owning area index -> the links it draws, in state.links order
+    const ownsVisible = new Set();  // owning area indexes with a link whose span reaches the screen
+    for (const link of state.links || []) {
+        const fi = firstWithId.get(link.fromAreaId), ti = firstWithId.get(link.toAreaId);
+        if (fi === undefined || ti === undefined) continue; // drawLinks draws nothing for it either
+        const owner = Math.max(fi, ti);
+        if (!linksByOwner.has(owner)) linksByOwner.set(owner, []);
+        linksByOwner.get(owner).push(link);
+        if (ownsVisible.has(owner)) continue;
         const fb = getRenderBBox(state.areas[fi]);
         const tb = getRenderBBox(state.areas[ti]);
-        if (!fb || !tb) return true; // unmeasurable → keep (fail safe)
-        return isBBoxOnScreen({
+        if (!fb || !tb || isBBoxOnScreen({ // unmeasurable → keep (fail safe)
             minX: Math.min(fb.minX, tb.minX), minY: Math.min(fb.minY, tb.minY),
             maxX: Math.max(fb.maxX, tb.maxX), maxY: Math.max(fb.maxY, tb.maxY)
-        });
-    });
+        })) ownsVisible.add(owner);
+    }
+    return { indexOf, linksByOwner, ownsVisible };
+}
+
+function areaOwnsVisibleLink(area, linkFrame) {
+    return linkFrame.ownsVisible.has(linkFrame.indexOf.get(area));
 }
 
 // Item-level convenience: measures the item and shifts its bbox by any in-progress
@@ -8533,6 +8549,8 @@ function drawAreas() {
         bgCanvas.height = canvas.height;
     }
     
+    const linkFrame = buildLinkFrame();
+
     for (const area of state.areas) {
         if (!isItemVisibleInContainer(area)) continue;
 
@@ -8552,7 +8570,7 @@ function drawAreas() {
                     abb = { minX: abb.minX + aoff.dx, minY: abb.minY + aoff.dy,
                             maxX: abb.maxX + aoff.dx, maxY: abb.maxY + aoff.dy };
                 }
-                if (!isBBoxOnScreen(abb) && !areaOwnsVisibleLink(area)) continue;
+                if (!isBBoxOnScreen(abb) && !areaOwnsVisibleLink(area, linkFrame)) continue;
             }
         }
 
@@ -8896,12 +8914,7 @@ function drawAreas() {
         // This ensures the link is drawn ON TOP of this area (and the other connected area),
         // but BEHIND any areas drawn after this one.
         // Get the index of the current area in state.areas
-        const currentIdx = state.areas.indexOf(area);
-        const linksForThisLayer = state.links.filter(link => {
-            const fromIdx = state.areas.findIndex(a => a.id === link.fromAreaId);
-            const toIdx = state.areas.findIndex(a => a.id === link.toAreaId);
-            return Math.max(fromIdx, toIdx) === currentIdx;
-        });
+        const linksForThisLayer = linkFrame.linksByOwner.get(linkFrame.indexOf.get(area)) || [];
         
         if (linksForThisLayer.length > 0) {
             drawLinks(linksForThisLayer);
@@ -8961,6 +8974,8 @@ function drawLinks(linksToDraw = state.links) {
         const tunnelAreas = [];   // case 3: clipped from the sharp line, shown blurred/dimmed instead
 
         for (const area of state.areas) {
+            // An area entirely off screen cannot cover any pixel of the line drawn there (t-f3471ea590).
+            if (!isBBoxOnScreen(getAreaBBox(area))) continue;
             if (area.id === link.fromAreaId || area.id === link.toAreaId) {
                 // EXCEPT if this endpoint is fully inside the other endpoint
                 const otherAreaId = (area.id === link.fromAreaId) ? link.toAreaId : link.fromAreaId;
@@ -10721,9 +10736,13 @@ function syncNotesDOM() {
             }
         }
         
-        // Hide off-screen notes unless the note's editor currently holds focus.
-        container.style.display = (isItemVisibleInContainer(note) &&
-            (isItemOnScreen(note) || container.contains(document.activeElement))) ? '' : 'none';
+        // Hide off-screen notes unless the note's editor currently holds focus. A hidden note's
+        // place, size, clip and colour are set again the first frame it is shown (t-4e69fb88ec).
+        const noteShown = isItemVisibleInContainer(note) &&
+            (isItemOnScreen(note) || container.contains(document.activeElement));
+        const noteDisplay = noteShown ? '' : 'none';
+        if (container.style.display !== noteDisplay) container.style.display = noteDisplay;
+        if (!noteShown) continue;
 
         const offset = getAnimationOffset(note);
         if (offset.dx !== 0 || offset.dy !== 0) {
