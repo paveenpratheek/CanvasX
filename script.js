@@ -7324,8 +7324,9 @@ function drawGrid(width, height) {
         globalMaxY = Math.ceil(globalMaxY / gridSize) * gridSize;
     }
     
-    // Draw base dots, skipping the global bbox of magnetic fields
-    if (state.graphicsPreset !== 'efficient') {
+    // Draw base dots, skipping the global bbox of magnetic fields - in the Efficient preset too:
+    // they are one path filled once a frame (t-80d84dce7d)
+    {
         ctx.fillStyle = baseColor;
         ctx.beginPath();
         for (let x = startX; x <= right + gridSize; x += gridSize) {
@@ -7396,7 +7397,7 @@ function drawGrid(width, height) {
                     ctx.beginPath();
                     ctx.arc(x, y, dotSize, 0, Math.PI * 2);
                     ctx.fill();
-                } else if (state.graphicsPreset !== 'efficient') {
+                } else {
                     baseDotsInBBox.push({x, y});
                 }
             }
@@ -9063,8 +9064,9 @@ function drawLinks(linksToDraw = state.links) {
 
         // ── DRAW BLURRED LINE INSIDE INCIDENTALLY-CROSSED AREAS ──
         // (hiddenAreas — direct containers of one endpoint — intentionally get no pass here,
-        // so the line is fully invisible behind them, not just dimmed.)
-        for (const intersection of tunnelAreas) {
+        // so the line is fully invisible behind them, not just dimmed.) In the Efficient preset
+        // every area is opaque, so the line goes wholly behind crossed areas too (t-edb490e3b4).
+        for (const intersection of (state.graphicsPreset === 'efficient' ? [] : tunnelAreas)) {
             ctx.save();
             ctx.beginPath();
             
