@@ -1489,7 +1489,7 @@ body.agent-view #agent-banner strong {
     color: #c7d2fe;
     font-size: 13px;
 }
-body.agent-view #toolbar .tool-btn:not(#btn-pan):not(#btn-home):not(#btn-theme),
+body.agent-view #toolbar .tool-btn:not(#btn-pan):not(#btn-home):not(#btn-theme):not(#btn-efficient),
 body.agent-view #toolbar .color-dropdown,
 body.agent-view #toolbar .tool-group:has(.color-dropdown),
 body.agent-view #toolbar .tool-group:has(#btn-home) + .separator,
@@ -3361,3 +3361,7 @@ body:has(#mission-control-overlay:not(.hidden)) #touch-stick { display: none; }
 #touch-stick.say { opacity: 0.9; }
 #touch-stick.none { animation: touch-stick-none 0.3s ease; }
 @keyframes touch-stick-none { 25% { translate: -6px 0; } 50% { translate: 6px 0; } 75% { translate: -3px 0; } }
+
+/* Efficient mode switch: on an agent canvas's toolbar only (t-9f0b5b4863) */
+#btn-efficient { display: none; }
+body.agent-view #btn-efficient { display: flex; }

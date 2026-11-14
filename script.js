@@ -471,7 +471,7 @@ function hidePropertiesPanel(mode) {
     }
     
     // Deactivate all
-    document.querySelectorAll('#toolbar .tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#toolbar .tool-btn:not(#btn-efficient)').forEach(b => b.classList.remove('active')); // a mode, not a tool (t-9f0b5b4863)
 }
 
 function updateInlineEditorStyle() {
@@ -9846,8 +9846,30 @@ async function isEmptyFabric(dirHandle) {
     }
 }
 
+// Efficient mode on agent canvases: a browser setting, as Tablet Mode is, since CanvasX never saves
+// an agent canvas and every NoteX redraw builds its state afresh (t-9f0b5b4863).
+function agentEfficient() {
+    try { return localStorage.getItem('canvasx-agent-efficient') === '1'; } catch (_) { return false; }
+}
+function applyAgentEfficient() {
+    const on = agentEfficient();
+    if (agentCanvas) state.graphicsPreset = on ? 'efficient' : 'performance';
+    const btn = document.getElementById('btn-efficient');
+    if (btn) {
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.title = on ? 'Efficient mode: on - areas drawn without their blur' : 'Efficient mode: off';
+    }
+}
+document.getElementById('btn-efficient').addEventListener('click', () => {
+    try { localStorage.setItem('canvasx-agent-efficient', agentEfficient() ? '0' : '1'); } catch (_) { /* this page only */ }
+    applyAgentEfficient();
+    render();
+});
+
 async function showAgentView() {
     document.body.classList.toggle('agent-view', agentCanvas);
+    applyAgentEfficient();
     if (agentWatch) { clearInterval(agentWatch); agentWatch = null; }
     if (agentCanvas) startAgentChat(); else stopAgentChat();
     if (!agentCanvas) return;
