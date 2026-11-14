@@ -4644,6 +4644,8 @@ function openPdfPreview(fileData) {
     `;
     
     document.body.appendChild(modal);
+    // An agent canvas is NoteX's to write: its PDFs are read and downloaded, never pinned (t-aa0d9daca6).
+    if (agentCanvas) modal.querySelector('#pdf-pin').style.display = 'none';
     
     // Apply critical styles inline to bypass any stale CSS cache
     Object.assign(modal.style, {
@@ -4799,6 +4801,7 @@ function openPdfPreview(fileData) {
     });
     
     pinBtn.addEventListener('click', () => {
+        if (agentCanvas) return;
         const canvas = modal.querySelector('.pdf-page-canvas');
         if (!canvas) return;
         
@@ -9909,6 +9912,7 @@ function isViewShortcut(e) {
 
 window.addEventListener('keydown', (e) => {
     if (!agentCanvas || e.key === ' ' || e.key === 'Escape') return;
+    if (e.target.closest && e.target.closest('#pdf-preview-modal')) return; // paging a PDF changes nothing (t-aa0d9daca6)
     const inChat = e.target.closest && e.target.closest('#agent-chat');
     if (!inChat && isViewShortcut(e)) return;
     // The chat takes its own keys here, so CanvasX's shortcuts never see them (t-4dc3f16e6e).
@@ -9926,6 +9930,40 @@ for (const type of ['drop', 'paste', 'dblclick', 'contextmenu', 'pointerdown']) 
         e.stopImmediatePropagation();
     }, true);
 }
+
+// A PDF on an agent canvas can still be read and downloaded: a click (not a drag) over its card, or
+// over a page pinned from it, opens the preview, whose Pin is hidden there (t-aa0d9daca6). The card
+// itself still takes no pointer, so it cannot be moved and a drag over it pans (t-d3001321f9).
+function pdfCardAt(x, y) {
+    for (let i = state.files.length - 1; i >= 0; i--) { // the card drawn last is on top
+        const f = state.files[i];
+        if (!f.isPdf && !f.isPinnedPdfPage) continue;
+        const el = document.getElementById(`file-${f.id}`);
+        if (!el || el.style.display === 'none') continue;
+        const r = el.getBoundingClientRect();
+        if (r.width && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return f;
+    }
+    return null;
+}
+let agentPress = null;
+const OUTSIDE_CANVAS = '#toolbar, #agent-banner, #totem-indicators, #agent-chat, #pdf-preview-modal';
+window.addEventListener('pointerdown', (e) => {
+    agentPress = agentCanvas && e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
+}, true);
+window.addEventListener('click', (e) => {
+    const press = agentPress;
+    agentPress = null;
+    if (!agentCanvas || !press || Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6) return;
+    if (e.target.closest && e.target.closest(OUTSIDE_CANVAS)) return;
+    const pdf = pdfCardAt(e.clientX, e.clientY);
+    if (!pdf) return;
+    e.stopImmediatePropagation();
+    openPdfPreview(pdf);
+}, true);
+window.addEventListener('pointermove', (e) => {
+    const over = agentCanvas && !e.buttons && !(e.target.closest && e.target.closest(OUTSIDE_CANVAS)) && Boolean(pdfCardAt(e.clientX, e.clientY));
+    document.body.classList.toggle('agent-over-pdf', over);
+}, { passive: true });
 
 // --- Chat with the agent ---
 // On an agent canvas the user talks to the agent beside the canvas; NoteX runs the agent, may change

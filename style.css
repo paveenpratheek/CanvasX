@@ -3365,3 +3365,6 @@ body:has(#mission-control-overlay:not(.hidden)) #touch-stick { display: none; }
 /* Efficient mode switch: on an agent canvas's toolbar only (t-9f0b5b4863) */
 #btn-efficient { display: none; }
 body.agent-view #btn-efficient { display: flex; }
+
+/* Over a PDF card on an agent canvas: a click opens it (t-aa0d9daca6) */
+body.agent-view.agent-over-pdf, body.agent-view.agent-over-pdf canvas { cursor: pointer !important; }
