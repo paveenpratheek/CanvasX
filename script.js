@@ -3972,6 +3972,52 @@ async function handleFileDrop(file, worldPos) {
     }
 }
 
+// Pictures not read yet: each is read from sources/ the first time its card comes on screen, and
+// its card is a picture card at the picture's saved size until then, so nothing jumps (t-cd7218be96).
+let picturesWaiting = new WeakSet();
+const picturesReading = new WeakSet();
+const BLANK_PICTURE = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+function readPicture(sourcesHandle, name) {
+    return sourcesHandle.getFileHandle(name)
+        .then(h => h.getFile())
+        .then(file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = ev => resolve(ev.target.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+        }));
+}
+
+function loadPictureWhenSeen(fileData) {
+    if (!picturesWaiting.has(fileData) || picturesReading.has(fileData) || !currentSourcesHandle) return;
+    picturesReading.add(fileData);
+    const sources = currentSourcesHandle;
+    readPicture(sources, fileData.name).then(url => {
+        picturesWaiting.delete(fileData);
+        // Another canvas opened meanwhile, or the card went: nothing to show it in.
+        if (sources !== currentSourcesHandle || !state.files.includes(fileData)) return;
+        const changed = fileData.imageDataUrl !== url;
+        fileData.imageDataUrl = url;
+        const img = document.querySelector(`#file-${CSS.escape(String(fileData.id))} img.image-preview`);
+        if (img) { if (changed) img.src = url; }
+        else { renderFileItem(fileData); scheduleRender(); }
+    }).catch(() => {
+        picturesWaiting.delete(fileData);
+        console.warn('Could not rehydrate media:', fileData.name);
+    }).finally(() => picturesReading.delete(fileData));
+}
+
+// The world rectangle on screen at a camera, with the same 12.5% margin per side as viewBounds.
+function boundsAtCamera(cam, width, height, marginRatio = 0.125) {
+    const z = cam.zoom || 1, x = cam.x || 0, y = cam.y || 0;
+    const mx = (width * marginRatio) / z, my = (height * marginRatio) / z;
+    return {
+        minX: (-width / 2 - x) / z - mx, maxX: (width / 2 - x) / z + mx,
+        minY: (-height / 2 - y) / z - my, maxY: (height / 2 - y) / z + my
+    };
+}
+
 function renderFileItem(fileData) {
     if (fileData.isHidden) return;
     
@@ -3982,7 +4028,8 @@ function renderFileItem(fileData) {
 
     
     const el = document.createElement('div');
-    el.className = fileData.isImage && fileData.imageDataUrl ? 'file-item image-item' : 'file-item';
+    const asPicture = fileData.isImage && (fileData.imageDataUrl || picturesWaiting.has(fileData));
+    el.className = asPicture ? 'file-item image-item' : 'file-item';
     el.id = `file-${fileData.id}`;
     
     el.style.left = `${fileData.x}px`;
@@ -4072,7 +4119,7 @@ function renderFileItem(fileData) {
         resizeHandle.addEventListener('pointerup', stopResize);
         resizeHandle.addEventListener('pointercancel', stopResize);
 
-    } else if (fileData.isImage && fileData.imageDataUrl) {
+    } else if (asPicture) {
         /* Image Preview Template */
         el.innerHTML = `
             <div class="file-options-btn">⋮</div>
@@ -4085,7 +4132,7 @@ function renderFileItem(fileData) {
                 <div class="menu-item danger action-delete">Delete</div>
             </div>
             <div class="image-preview-container">
-                <img src="${fileData.imageDataUrl}" 
+                <img src="${fileData.imageDataUrl || BLANK_PICTURE}" 
                      class="image-preview" 
                      alt="${fileData.name}"
                      style="width: ${fileData.imageWidth}px; height: ${fileData.imageHeight}px;"
@@ -7084,11 +7131,35 @@ function isItemOnScreen(item) {
 const TOTEM_FIELD = 750;
 const ITEM_FIELD = 450;
 
+// The grouping depends on the totems, the items and their extents, and constellation mode -
+// never on the camera - so it is kept until one of those changes instead of being worked out
+// again on every frame of a pan or zoom (t-dc9a2f6e3a). The key is rebuilt each frame from the
+// inputs themselves rather than from flags set where items change, which could miss one.
+let clusterKey = null;
+let clusterItems = [];
+
 function computeMagneticClusters() {
-    activeMagneticFields = [];
     const totems = state.totems || [];
+    const allItems = [
+        ...(state.areas || []),
+        ...(state.drawings || []),
+        ...(state.files || [])
+    ];
+    const bboxes = allItems.map(getItemBBox);
+    const keyParts = [state.isConstellationMode ? 1 : 0];
+    for (const t of totems) keyParts.push(t.id, t.x, t.y, t.color, t.parentTotemId || '');
+    keyParts.push('|');
+    for (const b of bboxes) keyParts.push(b ? `${b.minX},${b.minY},${b.maxX},${b.maxY}` : '-');
+    const key = keyParts.join(';');
+    // The same item objects too: a canvas opened again brings new objects with the same shapes.
+    if (key === clusterKey && allItems.length === clusterItems.length &&
+        allItems.every((item, i) => item === clusterItems[i])) return;
+    clusterKey = key;
+    clusterItems = allItems;
+
+    activeMagneticFields = [];
     if (totems.length === 0) return;
-    
+
     const parseHex = (hex) => {
         if (hex === 'transparent') return {r:0, g:0, b:0, a:0};
         if (hex && hex.startsWith('#')) {
@@ -7100,19 +7171,13 @@ function computeMagneticClusters() {
         return {r:59, g:90, b:118, a:1};
     };
     
-    const allItems = [
-        ...(state.areas || []),
-        ...(state.drawings || []),
-        ...(state.files || [])
-    ];
-    
     for (let item of allItems) {
         item.linkedTotemId = null;
     }
-    
-    const itemDatas = allItems.map(item => ({
+
+    const itemDatas = allItems.map((item, i) => ({
         item: item,
-        bbox: getItemBBox(item),
+        bbox: bboxes[i],
         visited: false,
         linkedTotem: null
     })).filter(d => d.bbox !== null);
@@ -9545,43 +9610,36 @@ async function openFabric(dirHandle, name) {
         
         let actualData = loadedState ? (loadedState.data ? loadedState.data : loadedState) : null;
         
-        // REHYDRATE FILES
+        // REHYDRATE FILES. Only the pictures on screen at the canvas's saved camera are read before
+        // it is drawn; every other picture is read the first time its card comes on screen
+        // (syncFilesVisibility), showing the data URL fabric.json holds meanwhile, and a PDF is read
+        // only when it is opened (openPdfPreview) (t-cd7218be96).
+        picturesWaiting = new WeakSet();
         if (actualData && actualData.files) {
-            // How many pictures and PDFs are in, for whoever set window.onFabricLoading (CanvasXP's loading card, t-2430327a34).
-            const media = actualData.files.filter(f => f.isImage || f.isPdf).length;
+            const cam = actualData.camera || { x: 0, y: 0, zoom: 1 };
+            const dpr = window.devicePixelRatio || 1;
+            const onScreenAtOpen = boundsAtCamera(cam, canvas.width / dpr, canvas.height / dpr);
+            const first = [];
+            for (const f of actualData.files) {
+                if (f.isPdf) f.pdfBlobUrl = null; // a blob URL saved by an earlier page no longer exists
+                if (!f.isImage || f.isYoutube || !f.name) continue;
+                const bb = getRenderBBox(f);
+                // A picture with no saved size is read now: its card could not be laid out without it.
+                if (!f.imageWidth || !f.imageHeight || !bb || bboxOverlap(bb, onScreenAtOpen)) first.push(f);
+                else picturesWaiting.add(f);
+            }
+            // How many pictures are read before the canvas shows, for whoever set window.onFabricLoading (CanvasXP's loading card, t-2430327a34).
             let mediaLoaded = 0;
-            const mediaProgress = () => { if (typeof window.onFabricLoading === 'function') window.onFabricLoading(mediaLoaded, media); };
+            const mediaProgress = () => { if (typeof window.onFabricLoading === 'function') window.onFabricLoading(mediaLoaded, first.length); };
             mediaProgress();
-            for (let f of actualData.files) {
-                if (f.isImage || f.isPdf) {
-                    try {
-                        let sourceFileHandle = null;
-                        
-                        if (f.areaId) {
-                            const area = (actualData.areas || []).find(a => a.id === f.areaId);
-                            /* Flat storage: removed area subdirectories */
-                        }
-                        
-                        if (!sourceFileHandle) {
-                            sourceFileHandle = await currentSourcesHandle.getFileHandle(f.name);
-                        }
-                        
-                        const sourceFile = await sourceFileHandle.getFile();
-                        if (f.isPdf) {
-                            f.pdfBlobUrl = URL.createObjectURL(sourceFile);
-                        } else if (f.isImage) {
-                            f.imageDataUrl = await new Promise(resolve => {
-                                const reader = new FileReader();
-                                reader.onload = ev => resolve(ev.target.result);
-                                reader.readAsDataURL(sourceFile);
-                            });
-                        }
-                    } catch (err) {
-                        console.warn('Could not rehydrate media:', f.name);
-                    }
-                    mediaLoaded++;
-                    mediaProgress();
+            for (const f of first) {
+                try {
+                    f.imageDataUrl = await readPicture(currentSourcesHandle, f.name);
+                } catch (err) {
+                    console.warn('Could not rehydrate media:', f.name);
                 }
+                mediaLoaded++;
+                mediaProgress();
             }
         }
         
@@ -10464,6 +10522,7 @@ function syncFilesVisibility() {
                 (isItemOnScreen(file) || el.contains(document.activeElement));
             const displayStyle = isVisible ? '' : 'none';
             if (el.style.display !== displayStyle) el.style.display = displayStyle;
+            if (isVisible) loadPictureWhenSeen(file); // read the first time it is seen (t-cd7218be96)
             
             if (isVisible) {
                 const offset = getAnimationOffset(file);
