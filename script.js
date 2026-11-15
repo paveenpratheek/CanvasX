@@ -115,28 +115,39 @@ const btnHome = document.getElementById('btn-home');
 let targetWorkspaceHandle = null;
 let currentFabricHandle = null;
 
-/* The background a canvas is shown on. In light mode a canvas left on the
- * default black is shown white - fill, grid, thumbnail and all that adapts
- * to a light background - while its fabric.json keeps black; any other
- * colour shows as saved (t-20cf6f1740). */
+/* The background a canvas is shown on. A canvas left on a default follows
+ * the theme: the default black is shown white in light mode (t-20cf6f1740),
+ * and the default white - what a canvas made in light mode, or by NoteX, is
+ * saved with - is shown black in dark mode (t-026d9e3a58). Fill, grid,
+ * thumbnail and all that adapts follow; fabric.json keeps what it saved, and
+ * any other colour shows as saved. */
 const DEFAULT_FABRIC_COLOR = '#1a1a1a';
+const DEFAULT_LIGHT_FABRIC_COLOR = '#ffffff';
 function shownFabricColor() {
     const saved = state.fabricColor || DEFAULT_FABRIC_COLOR;
-    return document.documentElement.dataset.theme === 'light' && saved.toLowerCase() === DEFAULT_FABRIC_COLOR ? '#ffffff' : saved;
+    const light = document.documentElement.dataset.theme === 'light';
+    const s = saved.toLowerCase();
+    if (light && s === DEFAULT_FABRIC_COLOR) return DEFAULT_LIGHT_FABRIC_COLOR;
+    if (!light && (s === DEFAULT_LIGHT_FABRIC_COLOR || s === '#fff' || s === 'white')) return DEFAULT_FABRIC_COLOR;
+    return saved;
 }
 
-/* The colour a text is shown in. In light mode, white or near-white text on
- * a light background is shown black; the canvas keeps the colour it saved
- * (t-e1bfa56fe3). */
+/* The colour a text is shown in. On a light shown background, white or
+ * near-white text is shown black (t-e1bfa56fe3); on a dark one, black or
+ * near-black text is shown near-white (t-026d9e3a58). The canvas keeps the
+ * colour it saved. */
 function shownTextColor(color) {
-    if (document.documentElement.dataset.theme !== 'light' || !color || !isColorLight(shownFabricColor())) return color;
+    if (!color) return color;
+    const bgLight = isColorLight(shownFabricColor());
     const c = String(color).trim().toLowerCase();
-    if (c === 'white') return '#111111';
+    if (c === 'white') return bgLight ? '#111111' : color;
+    if (c === 'black') return bgLight ? color : '#f8f9fa';
     let hex = c.replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
     if (!/^[0-9a-f]{6}$/.test(hex)) return color;
-    const nearWhite = [0, 2, 4].every(i => parseInt(hex.substring(i, i + 2), 16) >= 230);
-    return nearWhite ? '#111111' : color;
+    const ch = [0, 2, 4].map(i => parseInt(hex.substring(i, i + 2), 16));
+    if (bgLight) return ch.every(v => v >= 230) ? '#111111' : color;
+    return ch.every(v => v <= 40) ? '#f8f9fa' : color;
 }
 let currentSourcesHandle = null;
 let currentFabricName = null;
