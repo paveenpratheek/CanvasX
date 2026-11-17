@@ -35,8 +35,10 @@
 
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const svg = (markup) => { const t = document.createElement('template'); t.innerHTML = markup.trim(); const s = t.content.firstElementChild; s.setAttribute('aria-hidden', 'true'); return s; };
+  // CanvasX Studio's icon: a white square with a black border, the same in light and dark (t-e1f977513c).
+  const MARK_RECT = '<rect x="3" y="3" width="18" height="18" rx="3.5" fill="#FFFFFF" stroke="#1F1E1D" stroke-width="2"/>';
   const ICON = {
-    mark: '<svg width="22" height="22" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+    mark: `<svg width="22" height="22" viewBox="0 0 24 24">${MARK_RECT}</svg>`,
     canvasx: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="18" height="7" rx="1.5"/></svg>',
     notex: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>',
     rag: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
@@ -699,6 +701,13 @@
       f.dataset.cxsFonts = '1';
       document.head.append(f);
     }
+    // The browser tab's icon: CanvasX Studio's square (t-e1f977513c). CanvasXP, which leaves this script out, keeps its own.
+    for (const old of document.querySelectorAll('link[rel="icon"]')) old.remove();
+    const tabIcon = el('link');
+    tabIcon.rel = 'icon';
+    tabIcon.type = 'image/svg+xml';
+    tabIcon.href = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${MARK_RECT}</svg>`)}`;
+    document.head.append(tabIcon);
     document.body.classList.add('cxs');
     buildSide();
     buildNote();
