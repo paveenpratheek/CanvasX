@@ -1,0 +1,62 @@
+/* CanvasX | NoteX | RAGX (t-6b0606000f), and NoteX Studio's dialog (t-699030acb8). */
+.app-switch {
+    display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+    border-radius: 11px; border: 1px solid var(--panel-border);
+    background: var(--panel-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    font-family: 'Inter', sans-serif;
+}
+.app-switch-btn {
+    height: 30px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+    background: none; color: var(--text-secondary); font: 600 13px 'Inter', sans-serif; white-space: nowrap;
+}
+.app-switch-btn:hover { color: var(--text-color); background: var(--bg-hover); }
+.app-switch-btn.on { background: var(--accent); color: #fff; }
+.app-switch-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.home-header.has-switch h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.app-switch.home .app-switch-btn { height: 34px; padding: 0 16px; font-size: 14px; }
+.app-switch.floating { position: fixed; left: 24px; bottom: 24px; z-index: 60; }
+.app-switch.layer { position: absolute; left: 10px; top: 8px; z-index: 2; }
+
+.apps-layer { position: fixed; inset: 0; z-index: 1000000; background: var(--fabric-bg); }
+.apps-layer[hidden] { display: none; }
+.apps-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--fabric-bg); }
+body.apps-open .app-switch.floating { display: none; }
+
+.apps-dialog {
+    margin: auto; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+    padding: 26px 28px 22px; border: 1px solid var(--panel-border); border-radius: 18px;
+    background: #18181c; color: var(--text-color); font-family: 'Inter', sans-serif;
+    box-shadow: var(--shadow-pop); user-select: text; -webkit-user-select: text;
+}
+.apps-dialog::backdrop { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); }
+.apps-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.apps-dialog h2 { margin: 0; font-size: 22px; }
+.apps-lead { margin: 10px 0 18px; color: var(--text-secondary); line-height: 1.5; font-size: 14px; }
+.apps-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.apps-option { display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 14px; border: 1px solid var(--panel-border); background: rgba(255, 255, 255, 0.03); min-width: 0; }
+.apps-option h3 { margin: 0; font-size: 16px; }
+.apps-option p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.apps-option > .home-btn { align-self: flex-start; }
+.apps-result:empty { display: none; }
+.apps-option .apps-result, .apps-dialog > .apps-result { color: #86efac; }
+.apps-result.bad, .apps-dialog > .apps-result.bad { color: #fca5a5; }
+.apps-or { margin-top: auto !important; padding-top: 4px; }
+.apps-cmd { display: flex; align-items: stretch; gap: 8px; }
+.apps-cmd code { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 9px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--panel-border); font: 12px/1.45 Consolas, 'Courier New', monospace; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.apps-wait { margin: 16px 0 0; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 10px; }
+.apps-wait::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #eab308; animation: apps-pulse 1.4s ease-in-out infinite; }
+@keyframes apps-pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .apps-wait::before { animation: none; } }
+@media (max-width: 720px) { .apps-options { grid-template-columns: minmax(0, 1fr); } }
+
+:root[data-theme="light"] .apps-dialog { background: #ffffff; color: #1f2937; }
+:root[data-theme="light"] .apps-option { background: rgba(15, 23, 42, 0.03); border-color: rgba(15, 23, 42, 0.1); }
+:root[data-theme="light"] .apps-option p, :root[data-theme="light"] .apps-lead, :root[data-theme="light"] .apps-wait { color: #4b5563; }
+:root[data-theme="light"] .apps-cmd code { background: #f3f4f6; border-color: rgba(15, 23, 42, 0.12); }
+:root[data-theme="light"] .apps-option .apps-result { color: #166534; }
+:root[data-theme="light"] .apps-result.bad { color: #b91c1c; }
+:root[data-theme="light"] .app-switch { background: rgba(255, 255, 255, 0.85); border-color: rgba(15, 23, 42, 0.12); }
+:root[data-theme="light"] .app-switch-btn { color: #4b5563; }
+:root[data-theme="light"] .app-switch-btn:hover { color: #111827; background: rgba(15, 23, 42, 0.06); }
+:root[data-theme="light"] .app-switch-btn.on { color: #fff; background: var(--accent); }

@@ -38,6 +38,9 @@ swap(/(<meta name="viewport" content="[^"]*)(")/, '$1, interactive-widget=resize
 swap(/<link rel="stylesheet" href="style\.css\?v=[^"]*">/, `<link rel="stylesheet" href="style.css?v=${version}">\n    <link rel="stylesheet" href="xp.css?v=${version}">`);
 swap(/<script src="script\.js\?v=[^"]*"><\/script>/, `<script src="script.js?v=${version}"></script>\n    <script src="store.js?v=${version}"></script>\n    <script src="xp.js?v=${version}"></script>`);
 swap(/<h1>CanvasX<\/h1>/, '<h1>CanvasXP</h1>');
+// The switcher to NoteX and RAGX is CanvasX's on the PC; the phone has NoteX's sync instead (t-6b0606000f).
+swap(/\s*<link rel="stylesheet" href="apps\.css\?v=[^"]*">/, '');
+swap(/\s*<script src="apps\.js\?v=[^"]*"><\/script>/, '');
 swap(/<meta name="theme-color" content="[^"]*">/, '<meta name="theme-color" content="#141418">');
 swap(/<link rel="apple-touch-icon" href="[^"]*">/, '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n    <link rel="apple-touch-icon" href="icon-180.png">');
 fs.writeFileSync(path.join(SITE, 'index.html'), html);

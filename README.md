@@ -120,6 +120,15 @@ python -m http.server 9075
 
 Then go to `http://localhost:9075`, pick (or create) a workspace folder, and create a fabric.
 
+### NoteX and RAGX from CanvasX
+
+The switcher at the top of the home screen, and at the bottom left of a canvas, reads **CanvasX · NoteX · RAGX**. NoteX and RAGX come from [NoteX Studio](https://github.com/paveenpratheek/NoteX-Studio), which runs them on your PC:
+
+- When NoteX Studio is running, **NoteX** or **RAGX** opens its page in this same tab, with your canvas kept open behind it. The first time, its setup runs there: it checks and installs what it needs, asks whether your agent is Claude Code or Google Antigravity, and then asks to start NoteX and RAGX.
+- When it is not, a dialog offers **Setup NoteX and RAGX** or, if it is installed already, **Start it**. Either way you choose a folder, CanvasX writes a script there, and you run it once; the one command to paste into a terminal is shown as well. The dialog opens NoteX once the studio answers.
+
+CanvasX looks for the studio at `http://127.0.0.1:7075` (another address can be set in `localStorage['canvasx-studio-url']`). It only asks the studio whether it is there and shows the studio's page in a frame; it never holds the studio's token. CanvasXP has no switcher.
+
 ### CanvasXP on Netlify
 
 ```bash
@@ -134,6 +143,7 @@ This builds CanvasXP into `xp/site`: CanvasX's own page, script, styles and icon
 index.html        structure: toolbars, ribbons, modals, templates
 script.js         all application logic: state, rendering, events, tools, saving
 style.css         styles and animations
+apps.js, apps.css the CanvasX · NoteX · RAGX switcher and NoteX Studio's setup dialog
 sw.js             service worker
 manifest.json     PWA manifest
 knowledge/        the project's own append-only records: code map, progress, decisions
