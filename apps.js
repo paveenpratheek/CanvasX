@@ -19,7 +19,7 @@
  */
 (() => {
   const NAME = 'CanvasX Studio';
-  const REPO = 'https://github.com/paveenpratheek/NoteX-Studio.git'; // the repository keeps its name
+  const REPO = 'https://github.com/paveenpratheek/CanvasX-Studio.git'; // where the user published it (t-b380b11a14)
   const FOLDER = 'CanvasX Studio';
   const STUDIO = (() => {
     try { const u = new URL(localStorage.getItem('canvasx-studio-url') || ''); if (/^https?:$/.test(u.protocol)) return u.origin; } catch (_) { /* the default */ }

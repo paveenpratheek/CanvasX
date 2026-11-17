@@ -124,7 +124,7 @@ Then go to `http://localhost:9075`, pick (or create) a workspace folder, and cre
 
 CanvasX's front page is CanvasX Studio's, in AutomatU's look: a sidebar with **CanvasX · NoteX · RAGX**, your recent canvases and whether the studio is running; beside it your canvases as cards, newest first, with a search and filters. A click picks a canvas and shows its totems and counts; **Open the canvas** or a double click opens it. On an open canvas the sidebar steps aside and a compact switcher stays at the top left.
 
-NoteX and RAGX come from [CanvasX Studio](https://github.com/paveenpratheek/NoteX-Studio) (its repository keeps the name NoteX-Studio), which runs them on your PC:
+NoteX and RAGX come from [CanvasX Studio](https://github.com/paveenpratheek/CanvasX-Studio), which runs them on your PC:
 
 - When it is running, **NoteX** or **RAGX** opens its page beside the sidebar, in this same tab, with your canvas kept open behind it. The first time, its setup runs there: it checks and installs what it needs, asks whether your agent is Claude Code or Google Antigravity, and then asks to start NoteX and RAGX.
 - When it is not, a note says **The server is not running**. **Start the server** starts it on a PC where its setup set up **Start from CanvasX**; otherwise a dialog offers to set it up or, if it is installed already, to start it. Either way you choose a folder, CanvasX writes a script there, and you run it once; the commands to paste are there too. The dialog opens NoteX once the studio answers.
