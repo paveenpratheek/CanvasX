@@ -14,14 +14,18 @@
 .app-switch-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .home-header.has-switch h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.app-switch.home .app-switch-btn { height: 34px; padding: 0 16px; font-size: 14px; }
-.app-switch.floating { position: fixed; left: 24px; bottom: 24px; z-index: 60; }
-.app-switch.layer { position: absolute; left: 10px; top: 8px; z-index: 2; }
+/* The same place everywhere: over NoteX's and RAGX's 48px bar, the home screen and a canvas. */
+.app-switch.top, .app-switch.layer { position: fixed; left: 10px; top: 8px; }
+.app-switch.top { z-index: 99999; }
+.app-switch.layer { z-index: 2; }
+/* The canvas's hint line moves down from under it; the home header leaves room beside it. */
+.instructions { top: 56px; }
+.home-header.has-switch { justify-content: flex-end; margin-top: -31px; }
 
 .apps-layer { position: fixed; inset: 0; z-index: 1000000; background: var(--fabric-bg); }
 .apps-layer[hidden] { display: none; }
 .apps-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--fabric-bg); }
-body.apps-open .app-switch.floating { display: none; }
+body.apps-open .app-switch.top { display: none; }
 
 .apps-dialog {
     margin: auto; width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;

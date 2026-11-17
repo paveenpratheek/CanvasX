@@ -122,7 +122,7 @@ Then go to `http://localhost:9075`, pick (or create) a workspace folder, and cre
 
 ### NoteX and RAGX from CanvasX
 
-The switcher at the top of the home screen, and at the bottom left of a canvas, reads **CanvasX · NoteX · RAGX**. NoteX and RAGX come from [NoteX Studio](https://github.com/paveenpratheek/NoteX-Studio), which runs them on your PC:
+The switcher at the top left reads **CanvasX · NoteX · RAGX**, in the same place on the home screen, on a canvas and over NoteX and RAGX. NoteX and RAGX come from [NoteX Studio](https://github.com/paveenpratheek/NoteX-Studio), which runs them on your PC:
 
 - When NoteX Studio is running, **NoteX** or **RAGX** opens its page in this same tab, with your canvas kept open behind it. The first time, its setup runs there: it checks and installs what it needs, asks whether your agent is Claude Code or Google Antigravity, and then asks to start NoteX and RAGX.
 - When it is not, a dialog offers **Setup NoteX and RAGX** or, if it is installed already, **Start it**. Either way you choose a folder, CanvasX writes a script there, and you run it once; the one command to paste into a terminal is shown as well. The dialog opens NoteX once the studio answers.

@@ -1,7 +1,8 @@
 /* CanvasX, NoteX and RAGX in one tab (t-6b0606000f).
  *
- * The switcher - CanvasX | NoteX | RAGX - sits on the home screen and at the
- * bottom left of a canvas. NoteX and RAGX are NoteX Studio's: when the studio
+ * The switcher - CanvasX | NoteX | RAGX - sits at the top left, the same
+ * size and in the same place on the home screen, on a canvas, and over
+ * NoteX's and RAGX's bar. NoteX and RAGX are NoteX Studio's: when the studio
  * answers on this PC, its page opens in a frame over CanvasX, which stays
  * open behind it, and the studio's own setup runs there the first time.
  * When it does not answer, a dialog sets it up or starts it (t-699030acb8):
@@ -11,6 +12,7 @@
  * The studio answers /api/hello only to CanvasX's own addresses, and lets
  * only those frame its page; CanvasX never holds the studio's token
  * (NoteX Studio t-c614bd5011). CanvasXP has none of this (xp/make.js).
+ * Its one place, top left in all three views, is the user's (t-e602bd404b).
  */
 (() => {
   const REPO = 'https://github.com/paveenpratheek/NoteX-Studio.git';
@@ -280,11 +282,12 @@
   /* ------------------------------------------------------------- go */
 
   function init() {
-    // Home: the switcher where the name was; the name stays for CanvasXP's build to find.
+    // One place in all three: the top left, where it sits over NoteX's and RAGX's bar.
+    // The home screen's name stays in the page for CanvasXP's build to find, hidden.
     const header = document.querySelector('.home-header');
-    if (header) { header.classList.add('has-switch'); header.prepend(makeSwitch('home')); }
+    if (header) header.classList.add('has-switch');
     layer.append(makeSwitch('layer'));
-    document.body.append(makeSwitch('floating'), layer, dialog);
+    document.body.append(makeSwitch('top'), layer, dialog);
     paint();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
