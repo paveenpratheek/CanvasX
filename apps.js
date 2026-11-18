@@ -8,6 +8,8 @@
  *   where the user put it (t-e602bd404b).
  * - The front page: a crumb and a serif title, a search, the canvases as
  *   cards, a click picking one and a panel telling its totems (t-8ffd76e25a).
+ * - The RAGX conversations pinned in RAGX, under Pinned, whichever view is
+ *   open; one opens RAGX on that conversation (t-bd3bf6f447).
  * - NoteX and RAGX are CanvasX Studio's: when it answers, its page opens in
  *   a frame beside the sidebar, the canvas kept open behind. When it does
  *   not, a note says the server is not running (t-cd919a268f), and a dialog
@@ -31,6 +33,7 @@
   const FLAG = KNOWN.includes(ORIGIN) || !/^https?:\/\/[A-Za-z0-9.\-\[\]:]+$/.test(ORIGIN) ? '' : ` --canvasx-origin ${ORIGIN}`;
   const WINDOWS = /win/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
   const LAUNCHER_KEY = 'canvasx-studio-launcher';
+  const PINS_KEY = 'canvasx-studio-pins'; // the last list, so the sidebar does not flicker on load
   const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* private window */ } } };
 
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -77,6 +80,7 @@
     studio.setupDone = Boolean(hi && hi.setupDone);
     studio.engines = (hi && hi.engines) || [];
     if (hi && hi.launcher) store.set(LAUNCHER_KEY, '1');
+    if (hi && Array.isArray(hi.pins)) setPins(hi.pins);
     paintStatus();
     if (studio.up) hideNote();
     else if (was !== false && !frame) showNote();
@@ -88,6 +92,8 @@
   const side = el('aside', 'cxs-side');
   side.setAttribute('aria-label', NAME);
   const recentList = el('div', 'cxs-rows');
+  const pinsBox = el('div', 'cxs-pins');
+  const pinRows = el('div', 'cxs-rows');
   const statusName = el('span', 'cxs-st-name');
   const statusMeta = el('span', 'cxs-st-meta');
   const statusDot = el('span', 'cxs-dot');
@@ -108,6 +114,7 @@
       nav.append(b);
     }
     switches.push(nav);
+    pinsBox.append(el('div', 'cxs-h', 'Pinned'), pinRows);
     const list = el('div', 'cxs-list');
     const add = el('button', 'cxs-add');
     add.type = 'button';
@@ -124,7 +131,42 @@
     setup.append(svg(ICON.gear), 'Setup');
     setup.addEventListener('click', openSetup);
     foot.append(st, setup);
-    side.append(brand, nav, list, foot);
+    side.append(brand, nav, pinsBox, list, foot);
+  }
+
+  /* ------------------------------------------------- pinned in RAGX */
+
+  // Ids and titles only, from the studio (CanvasX Studio's t-1b6a07a0c5); titles are only ever text here.
+  let pins = (() => { try { return clean(JSON.parse(store.get(PINS_KEY) || '[]')); } catch (_) { return []; } })();
+  function clean(list) {
+    return (Array.isArray(list) ? list : []).filter((p) => p && Number(p.id) > 0)
+      .map((p) => ({ id: Number(p.id), title: String(p.title || 'Untitled').slice(0, 200) }));
+  }
+  function setPins(list) {
+    const next = clean(list);
+    if (JSON.stringify(next) === JSON.stringify(pins) && pinRows.childElementCount) return;
+    pins = next;
+    store.set(PINS_KEY, JSON.stringify(pins));
+    paintPins();
+  }
+  function paintPins() {
+    pinsBox.hidden = !pins.length;
+    pinRows.replaceChildren(...pins.map((p) => {
+      const b = el('button', 'cxs-row cxs-pin');
+      b.type = 'button';
+      b.title = `${p.title} - in RAGX`;
+      const nm = el('span', 'cxs-row-name');
+      nm.append(svg(ICON.rag), el('span', 'cxs-ellipsis', p.title));
+      b.append(nm);
+      b.addEventListener('click', () => openPinned(p.id));
+      return b;
+    }));
+  }
+  async function openPinned(id) {
+    if (frame) { tell({ show: 'rag', conversation: id, theme: themeNow() }); view = 'rag'; paint(); return; }
+    const hi = await refresh();
+    if (hi) openFrame('rag', { conversation: id });
+    else { pending = 'rag'; openDialog(); }
   }
 
   function paintStatus() {
@@ -179,12 +221,12 @@
   const tell = (msg) => { if (frame && frameReady) frame.contentWindow.postMessage({ notexStudio: 1, ...msg }, STUDIO); };
   new MutationObserver(() => tell({ theme: themeNow() })).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-  function openFrame(id) {
+  function openFrame(id, { conversation = null } = {}) {
     if (!frame) {
       frame = el('iframe', 'apps-frame');
       frame.title = NAME;
       frame.allow = 'clipboard-write';
-      frame.src = `${STUDIO}/?embed=1&view=${encodeURIComponent(id)}&theme=${themeNow()}`;
+      frame.src = `${STUDIO}/?embed=1&view=${encodeURIComponent(id)}&theme=${themeNow()}${conversation ? `&conversation=${Number(conversation)}` : ''}`;
       frame.addEventListener('load', () => { frameReady = true; tell({ theme: themeNow() }); });
       layer.prepend(frame);
     } else {
@@ -201,6 +243,7 @@
     if (m.event === 'ready') { frameReady = true; tell({ theme: themeNow() }); }
     if (m.event === 'show' && m.view === 'canvasx') { view = 'canvasx'; paint(); }
     if (m.event === 'setup-done') refresh();
+    if (m.event === 'pins') setPins(m.pins);
   });
 
   async function go(id) {
@@ -716,6 +759,7 @@
     paint();
     paintStatus();
     paintRecent();
+    paintPins();
     refresh();
     setInterval(() => { if (!document.hidden) refresh(); }, 6000);
   }

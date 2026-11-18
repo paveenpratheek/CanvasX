@@ -68,6 +68,10 @@ body.cxs-down .cxs-tab[data-view="notex"] .cxs-off, body.cxs-down .cxs-tab[data-
 .cxs-list { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cxs-side[data-view="notex"] .cxs-list, .cxs-side[data-view="rag"] .cxs-list { display: none; }
 .cxs-h { padding: 0 10px 4px; font-size: 12px; color: var(--x-ink-4); }
+/* Pinned in RAGX, under the views whichever is open (t-bd3bf6f447). */
+.cxs-pins:not([hidden]) { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cxs-pin .cxs-row-name svg { flex: none; width: 14px; height: 14px; color: var(--x-ink-3); }
+.cxs-row.cxs-pin { font-size: 13px; }
 .cxs-rows { display: flex; flex-direction: column; gap: 2px; }
 .cxs-row {
     display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; padding: 0 10px;
